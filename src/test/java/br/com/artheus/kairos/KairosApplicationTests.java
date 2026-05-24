@@ -1,4 +1,4 @@
-package kairos;
+package br.com.artheus.kairos;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.boot.test.context.SpringBootTest;

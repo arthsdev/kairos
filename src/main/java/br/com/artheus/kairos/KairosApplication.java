@@ -1,4 +1,4 @@
-package kairos;
+package br.com.artheus.kairos;
 
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
