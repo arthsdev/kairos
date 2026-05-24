@@ -47,7 +47,9 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT: false
-    command: start-dev
+    command: start-dev --import-realm
+    volumes:
+      - ./keycloak:/opt/keycloak/data/import
     ports:
       - "${KEYCLOAK_PORT}:8080"
     depends_on:
