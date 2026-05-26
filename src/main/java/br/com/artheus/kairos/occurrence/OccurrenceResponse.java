@@ -1,0 +1,35 @@
+package br.com.artheus.kairos.occurrence;
+
+import java.time.LocalDateTime;
+
+public record OccurrenceResponse(
+
+        String id,
+        String title,
+        String description,
+        OccurrenceCategory category,
+        OccurrenceSeverity severity,
+        OccurrenceStatus status,
+        Double latitude,
+        Double longitude,
+        String imageUrl,
+        String userId,
+        LocalDateTime createdAt
+) {
+
+    public static OccurrenceResponse from(Occurrence occurrence) {
+        return new OccurrenceResponse(
+                occurrence.getId(),
+                occurrence.getTitle(),
+                occurrence.getDescription(),
+                occurrence.getCategory(),
+                occurrence.getSeverity(),
+                occurrence.getStatus(),
+                occurrence.getLatitude(),
+                occurrence.getLongitude(),
+                occurrence.getImageUrl(),
+                occurrence.getUserId(),
+                occurrence.getCreatedAt()
+        );
+    }
+}
