@@ -46,3 +46,7 @@ logging:
   level:
     root: INFO
     br.com.artheus.kairos: DEBUG
+
+config:
+  scheduler:
+    plans-interval: "3600000" # 1 hour in ms
