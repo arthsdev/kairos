@@ -49,4 +49,5 @@ logging:
 
 config:
   scheduler:
-    plans-interval: "3600000" # 1 hour in ms
+    plans-interval: "3600000" # 1 hour
+    climate-interval: "900000" # 15 minutes
