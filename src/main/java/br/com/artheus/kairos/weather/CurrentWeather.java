@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.climate;
+package br.com.artheus.kairos.weather;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
 

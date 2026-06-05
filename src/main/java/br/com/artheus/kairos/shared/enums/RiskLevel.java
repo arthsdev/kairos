@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.climate;
+package br.com.artheus.kairos.shared.enums;
 
 public enum RiskLevel {
     LOW,

@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.climate;
+package br.com.artheus.kairos.cities;
 
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import jakarta.persistence.*;
