@@ -40,6 +40,7 @@ public class ClimateData {
     @Column(nullable = false)
     private LocalDateTime collectedAt;
 
+    /*Debt*/
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
     private MonitoredCity city;
