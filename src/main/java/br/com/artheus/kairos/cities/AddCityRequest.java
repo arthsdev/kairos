@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.climate;
+package br.com.artheus.kairos.cities;
 
 public record AddCityRequest(
         String  cityName

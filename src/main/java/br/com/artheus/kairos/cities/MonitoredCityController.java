@@ -1,5 +1,8 @@
-package br.com.artheus.kairos.climate;
+package br.com.artheus.kairos.cities;
 
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
+import br.com.artheus.kairos.weather.GeocodingResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,11 +18,13 @@ import java.util.List;
 @RequiredArgsConstructor
 public class MonitoredCityController {
 
-    private final ClimateService climateService;
+    private final MonitoredCityService monitoredCityService;
+
+    private final ClimateDataProvider climateDataProvider;
 
     @GetMapping("/search")
     public ResponseEntity<GeocodingResponse> searchCity(@RequestParam("name") String cityName) {
-        return ResponseEntity.ok(climateService.searchCity(cityName));
+        return ResponseEntity.ok(monitoredCityService.searchCity(cityName));
     }
 
     @PostMapping
@@ -30,7 +35,7 @@ public class MonitoredCityController {
 
         String userId = jwt.getSubject();
 
-        MonitoredCityResponse monitoredCityResponse = climateService.addCityToMonitor(addCityRequest.cityName(), userId);
+        MonitoredCityResponse monitoredCityResponse = monitoredCityService.addCityToMonitor(addCityRequest.cityName(), userId);
 
         URI uri = uriBuilder
                 .path("/api/v1/monitored-cities/{id}")
@@ -44,6 +49,12 @@ public class MonitoredCityController {
     public ResponseEntity<List<MonitoredCityResponse>> listMyCities(@AuthenticationPrincipal Jwt jwt) {
         String userId = jwt.getSubject();
 
-        return ResponseEntity.ok(climateService.listMyCities(userId));
+        return ResponseEntity.ok(monitoredCityService.listMyCities(userId));
     }
+
+    @GetMapping("/{id}/climate")
+    public ResponseEntity<ClimateDataSummary> findLatestByCity(@PathVariable String id) {
+        return ResponseEntity.ok(climateDataProvider.findLatestByCity(id));
+    }
+
 }

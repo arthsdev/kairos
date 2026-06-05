@@ -1,5 +1,7 @@
 package br.com.artheus.kairos.climate;
 
+import br.com.artheus.kairos.cities.MonitoredCity;
+import br.com.artheus.kairos.shared.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -42,4 +44,8 @@ public class ClimateData {
     @JoinColumn(name = "city_id", nullable = false)
     private MonitoredCity city;
 
+    @PrePersist
+    protected void onCreate() {
+        riskLevel = RiskLevel.LOW;
+    }
 }
