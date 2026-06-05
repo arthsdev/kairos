@@ -54,6 +54,9 @@ public class Occurrence {
     @Column(name = "deleted_at")
     private LocalDateTime deletedAt;
 
+    @Column(name = "city_id", nullable = false)
+    private String cityId;
+
     public void delete() {
         if (this.deletedAt != null) {
            throw new BusinessException("You can't delete this occurrence.");

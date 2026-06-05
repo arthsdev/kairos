@@ -26,6 +26,7 @@ public class OccurrenceService {
                 .longitude(request.longitude())
                 .imageUrl(request.imageUrl())
                 .userId(userId)
+                .cityId(request.cityId())
                 .build();
 
         occurrenceRepository.save(occurrence);
@@ -40,7 +41,6 @@ public class OccurrenceService {
                 .map(OccurrenceResponse::from)
                 .toList();
     }
-
 
     @Transactional
     public OccurrenceResponse updateOccurrence(String id, OccurrenceRequest request, String userId) {

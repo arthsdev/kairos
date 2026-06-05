@@ -26,6 +26,9 @@ public record OccurrenceRequest(
         @DecimalMax("180.0")
         Double longitude,
 
-        String imageUrl
+        String imageUrl,
+
+        @NotNull(message = "City id cannot be null.")
+        String cityId
 ) {
 }

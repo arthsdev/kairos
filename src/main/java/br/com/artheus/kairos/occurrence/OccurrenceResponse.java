@@ -14,7 +14,8 @@ public record OccurrenceResponse(
         Double longitude,
         String imageUrl,
         String userId,
-        LocalDateTime createdAt
+        LocalDateTime createdAt,
+        String cityId
 ) {
 
     public static OccurrenceResponse from(Occurrence occurrence) {
@@ -29,7 +30,8 @@ public record OccurrenceResponse(
                 occurrence.getLongitude(),
                 occurrence.getImageUrl(),
                 occurrence.getUserId(),
-                occurrence.getCreatedAt()
+                occurrence.getCreatedAt(),
+                occurrence.getCityId()
         );
     }
 }
