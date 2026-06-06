@@ -64,4 +64,15 @@ public class PlanService {
         });
     }
 
+    /*If plan doesn't exist this method will add a trial plan on the first request
+    * via PlanFirstAccessFilter */
+    @Transactional
+    public void ensurePlanExists(String userId) {
+        if (!planRepository.existsByUserId(userId)) {
+            Plan plan = Plan.builder()
+                    .userId(userId)
+                    .build();
+            planRepository.save(plan);
+        }
+    }
 }
