@@ -14,4 +14,5 @@ public interface PlanRepository extends JpaRepository<Plan, String> {
 
     List<Plan> findByExpiresAtBeforeAndPlanTypeNot(LocalDateTime dateTime, PlanType planType);
 
+    boolean existsByUserId(String userId);
 }
