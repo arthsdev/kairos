@@ -1,6 +1,6 @@
 package br.com.artheus.kairos.climate;
 
-import br.com.artheus.kairos.cities.MonitoredCity;
+import br.com.artheus.kairos.cities.City;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -43,7 +43,7 @@ public class ClimateData {
     /*Debt*/
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "city_id", nullable = false)
-    private MonitoredCity city;
+    private City city;
 
     @PrePersist
     protected void onCreate() {

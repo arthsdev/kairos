@@ -1,33 +1,32 @@
 package br.com.artheus.kairos.cities;
 
-import java.time.LocalDateTime;
-
 public record MonitoredCityResponse(
 
-        String id,
+         String id,
 
-        String name,
+         String name,
 
-        String state,
+         String state,
 
-        Double latitude,
+         Double latitude,
 
-        Double longitude,
+         Double longitude,
 
-        boolean active,
+         String country,
 
-        LocalDateTime createdAt
+         boolean active
+
 ) {
 
-    public static MonitoredCityResponse from(MonitoredCity city) {
+    public static MonitoredCityResponse from(City city, UserCity userCity) {
         return new MonitoredCityResponse(
                 city.getId(),
                 city.getName(),
                 city.getState(),
                 city.getLatitude(),
                 city.getLongitude(),
-                city.isActive(),
-                city.getCreatedAt()
+                city.getCountry(),
+                userCity.isActive()
         );
     }
 }

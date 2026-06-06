@@ -11,79 +11,125 @@ import br.com.artheus.kairos.weather.GeocodingResult;
 import br.com.artheus.kairos.weather.OpenMeteoClient;
 import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class MonitoredCityService implements CityProvider {
 
     private final PlanRepository planRepository;
-    private final MonitoredCityRepository monitoredCityRepository;
+    private final UserCityRepository userCityRepository;
+    private final CityRepository cityRepository;
     private final OpenMeteoClient openMeteoClient;
 
     public GeocodingResponse searchCity(String cityName) {
-        if (cityName == null || cityName.isEmpty()) {
+        if (cityName == null || cityName.isBlank()) {
             throw new BusinessException("City name cannot be null or empty");
         }
         return openMeteoClient.searchCity(cityName);
     }
 
-
+    @Transactional
     public MonitoredCityResponse addCityToMonitor(String cityName, String userId) {
+        validateUserPlanLimit(userId);
 
+        GeocodingResult geocodingResult = fetchCityFromExternalApi(cityName);
+        City city = getOrCreateCity(geocodingResult);
+
+        validateUniqueMonitoring(userId, city.getId());
+
+        UserCity userCity = saveUserCityAssociation(userId, city.getId());
+
+        return MonitoredCityResponse.from(city, userCity);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MonitoredCityResponse> listMyCities(String userId) {
+        List<UserCity> userCities = userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
+
+        return userCities.stream()
+                .map(userCity -> {
+                    City city = fetchCityOrThrow(userCity.getCityId());
+                    return MonitoredCityResponse.from(city, userCity);
+                })
+                .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CityLocation> findActiveCities() {
+        List<UserCity> userCities = userCityRepository.findAllByActiveTrue();
+
+        return userCities.stream()
+                .map(userCity -> {
+                    City city = fetchCityOrThrow(userCity.getCityId());
+                    return new CityLocation(city.getId(), city.getName(), city.getLatitude(), city.getLongitude());
+                })
+                .collect(Collectors.toList());
+    }
+
+    // ==========================================
+    // Aux Methods
+    // ==========================================
+
+    private void validateUserPlanLimit(String userId) {
         Plan plan = planRepository.findByUserId(userId)
                 .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
 
-        long cityCount = monitoredCityRepository.countByRequestedByAndActiveTrue(userId);
+        long cityCount = userCityRepository.countByUserIdAndActiveTrue(userId);
 
         if (plan.hasReachedCityLimit(cityCount)) {
             throw new BusinessException("City limit reached for your plan");
         }
+    }
 
+    private GeocodingResult fetchCityFromExternalApi(String cityName) {
         GeocodingResponse geocoding = openMeteoClient.searchCity(cityName);
 
         if (geocoding.results() == null || geocoding.results().isEmpty()) {
             throw new BusinessException("City not found");
         }
 
-        GeocodingResult result = geocoding.results().get(0);
+        return geocoding.results().get(0);
+    }
 
-        if (monitoredCityRepository.existsByNameAndRequestedByAndActiveTrue(cityName, userId)) {
-            throw new BusinessException("City already being monitored");
+    private City getOrCreateCity(GeocodingResult result) {
+        return cityRepository.findByName(result.name())
+                .orElseGet(() -> {
+                    City newCity = City.builder()
+                            .name(result.name())
+                            .state(result.admin1())
+                            .latitude(result.latitude())
+                            .longitude(result.longitude())
+                            .country(result.country())
+                            .build();
+                    return cityRepository.save(newCity);
+                });
+    }
+
+    private void validateUniqueMonitoring(String userId, String cityId) {
+        boolean alreadyMonitoring = userCityRepository
+                .findByUserIdAndCityIdAndActiveTrue(userId, cityId)
+                .isPresent();
+
+        if (alreadyMonitoring) {
+            throw new BusinessException("You are already monitoring this city");
         }
+    }
 
-        MonitoredCity city = MonitoredCity.builder()
-                .name(result.name())
-                .state(result.admin1())
-                .latitude(result.latitude())
-                .longitude(result.longitude())
-                .requestedBy(userId)
+    private UserCity saveUserCityAssociation(String userId, String cityId) {
+        UserCity userCity = UserCity.builder()
+                .userId(userId)
+                .cityId(cityId)
                 .build();
-
-        monitoredCityRepository.save(city);
-
-        return MonitoredCityResponse.from(city);
+        return userCityRepository.save(userCity);
     }
 
-    public List<MonitoredCityResponse> listMyCities(String userId) {
-        return monitoredCityRepository.findAllByRequestedBy(userId)
-                .stream()
-                .map(MonitoredCityResponse::from)
-                .toList();
-
-    }
-
-    @Override
-    public List<CityLocation> findActiveCities() {
-        return monitoredCityRepository.findAllByActive(true)
-                .stream()
-                .map(city -> new CityLocation(
-                        city.getId(),
-                        city.getName(),
-                        city.getLatitude(),
-                        city.getLongitude()
-                ))
-                .toList();
+    private City fetchCityOrThrow(String cityId) {
+        return cityRepository.findById(cityId)
+                .orElseThrow(() -> new ResourceNotFoundException("City not found with ID: " + cityId));
     }
 }
