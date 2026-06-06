@@ -1,9 +1,9 @@
 package br.com.artheus.kairos.climate;
 
+import br.com.artheus.kairos.cities.City;
 import br.com.artheus.kairos.shared.contract.cities.CityLocation;
 import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
-import br.com.artheus.kairos.cities.MonitoredCity;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.weather.OpenMeteoClient;
@@ -36,7 +36,7 @@ public class ClimateService implements ClimateDataProvider {
             try {
                 WeatherResponse weather = openMeteoClient.getWeather(city.latitude(), city.longitude());
 
-                MonitoredCity cityRef = MonitoredCity.builder()
+                City cityRef = City.builder()
                         .id(city.id())
                         .build();
 
