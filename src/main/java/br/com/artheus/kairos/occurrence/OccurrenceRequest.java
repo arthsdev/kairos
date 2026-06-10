@@ -1,5 +1,7 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
+import br.com.artheus.kairos.shared.enums.OccurrenceSeverity;
 import jakarta.validation.constraints.*;
 
 public record OccurrenceRequest(

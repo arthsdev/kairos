@@ -2,6 +2,7 @@ package br.com.artheus.kairos.shared.scheduler;
 
 import br.com.artheus.kairos.climate.ClimateService;
 import br.com.artheus.kairos.plan.PlanService;
+import br.com.artheus.kairos.risk.RiskEngine;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
@@ -14,6 +15,7 @@ public class KairosScheduler {
 
     private final PlanService planService;
     private final ClimateService climateService;
+    private final RiskEngine riskEngine;
 
     @Scheduled(fixedRateString = "${config.scheduler.plans-interval}")
     public void checkExpiredPlans() {
@@ -26,8 +28,9 @@ public class KairosScheduler {
 
     @Scheduled(fixedRateString = "${config.scheduler.climate-interval}")
     public void fetchClimateData() {
-        log.info("Starting climate data fetch...");
+        log.info("Starting climate data fetch and risk calculation...");
         climateService.fetchClimateDataForAllCities();
-        log.info("Climate data fetch finished.");
+        riskEngine.calculateRiskForAllCities();
+        log.info("Climate data fetch and risk calculation finished.");
     }
 }

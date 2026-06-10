@@ -1,5 +1,8 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
+import br.com.artheus.kairos.shared.enums.OccurrenceSeverity;
+import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.*;

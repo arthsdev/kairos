@@ -1,5 +1,8 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceDataProvider;
+import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
+import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -10,7 +13,7 @@ import java.util.List;
 
 @Service
 @RequiredArgsConstructor
-public class OccurrenceService {
+public class OccurrenceService implements OccurrenceDataProvider {
 
     private final OccurrenceRepository occurrenceRepository;
 
@@ -40,6 +43,22 @@ public class OccurrenceService {
                 .stream()
                 .map(OccurrenceResponse::from)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<OccurrenceSummary> findVerifiedByCityId(String cityId) {
+        List<Occurrence> verifiedCurrencies = occurrenceRepository.findByCityIdAndStatusIn(
+                cityId,
+                List.of(OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED)
+        );
+
+        return verifiedCurrencies.stream()
+                .map(occurrence -> new OccurrenceSummary(
+                        occurrence.getCategory(),
+                        occurrence.getSeverity(),
+                        occurrence.getStatus(),
+                        cityId
+                )).toList();
     }
 
     @Transactional

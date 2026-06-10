@@ -45,6 +45,10 @@ public class ClimateData {
     @JoinColumn(name = "city_id", nullable = false)
     private City city;
 
+    public void updateRiskLevel(RiskLevel newRiskLevel) {
+        this.riskLevel = newRiskLevel;
+    }
+
     @PrePersist
     protected void onCreate() {
         riskLevel = RiskLevel.LOW;

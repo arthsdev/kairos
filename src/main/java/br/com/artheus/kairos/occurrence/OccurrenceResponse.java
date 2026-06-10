@@ -1,5 +1,9 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
+import br.com.artheus.kairos.shared.enums.OccurrenceSeverity;
+import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
+
 import java.time.LocalDateTime;
 
 public record OccurrenceResponse(
