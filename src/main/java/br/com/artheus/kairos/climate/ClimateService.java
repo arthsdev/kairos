@@ -5,6 +5,8 @@ import br.com.artheus.kairos.shared.contract.cities.CityLocation;
 import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
+import br.com.artheus.kairos.shared.contract.risk.RiskProvider;
+import br.com.artheus.kairos.shared.enums.RiskLevel;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.weather.OpenMeteoClient;
 import br.com.artheus.kairos.weather.WeatherResponse;
@@ -20,7 +22,7 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ClimateService implements ClimateDataProvider {
+public class ClimateService implements ClimateDataProvider, RiskProvider {
 
     private final CityProvider cityProvider;
 
@@ -56,7 +58,7 @@ public class ClimateService implements ClimateDataProvider {
         climateDataRepository.saveAll(climateDataList);
     }
 
-    public ClimateDataSummary findLatestByCity(String cityId){
+    public ClimateDataSummary findLatestByCity(String cityId) {
 
         return climateDataRepository.findFirstByCityIdOrderByCollectedAtDesc(cityId)
                 .map(climateData -> new ClimateDataSummary(
@@ -68,5 +70,14 @@ public class ClimateService implements ClimateDataProvider {
                         climateData.getCollectedAt()
                 ))
                 .orElseThrow(() -> new ResourceNotFoundException("This city has no climate data"));
+    }
+
+    public void saveCalculatedRisk(String cityId, RiskLevel riskLevel) {
+        ClimateData climateData = climateDataRepository.findFirstByCityIdOrderByCollectedAtDesc(cityId)
+                .orElseThrow(() -> new ResourceNotFoundException("This city has no climate data"));
+
+        climateData.updateRiskLevel(riskLevel);
+
+        climateDataRepository.save(climateData);
     }
 }

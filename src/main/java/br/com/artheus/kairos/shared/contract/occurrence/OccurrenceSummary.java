@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.shared.contract.risk;
+package br.com.artheus.kairos.shared.contract.occurrence;
 
 import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
 import br.com.artheus.kairos.shared.enums.OccurrenceSeverity;

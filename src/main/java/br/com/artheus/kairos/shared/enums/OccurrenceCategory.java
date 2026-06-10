@@ -1,4 +1,4 @@
-package br.com.artheus.kairos.occurrence;
+package br.com.artheus.kairos.shared.enums;
 
 public enum OccurrenceCategory {
     FLOOD,
