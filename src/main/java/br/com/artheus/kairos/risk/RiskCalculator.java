@@ -1,6 +1,7 @@
 package br.com.artheus.kairos.risk;
 
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
+import br.com.artheus.kairos.shared.contract.climate.ClimateInput;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
 import lombok.RequiredArgsConstructor;
@@ -22,7 +23,7 @@ public class RiskCalculator {
     // Smoothing factor to prevent a few occurrences from maxing out the score immediately
     private static final double OCCURRENCE_SMOOTHING_FACTOR = 5.0;
 
-    public RiskLevel calculate(ClimateDataSummary climate, List<OccurrenceSummary> occurrences) {
+    public RiskLevel calculate(ClimateInput climate, List<OccurrenceSummary> occurrences) {
         RiskLevel climateRisk = evaluateClimateRisk(climate);
         double climateScore = mapRiskLevelToScore(climateRisk);
 
@@ -34,7 +35,8 @@ public class RiskCalculator {
         return mapScoreToRiskLevel(finalScore);
     }
 
-    private static RiskLevel evaluateClimateRisk(ClimateDataSummary climate) {
+
+    private static RiskLevel evaluateClimateRisk(ClimateInput climate) {
         if (climate.rainVolume() >= 50.0 || climate.windSpeed() >= 80.0) return RiskLevel.CRITICAL;
         if (climate.rainVolume() >= 21.0 || climate.windSpeed() >= 51.0) return RiskLevel.HIGH;
         if (climate.rainVolume() >= 5.0  || climate.windSpeed() >= 30.0) return RiskLevel.MEDIUM;
