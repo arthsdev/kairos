@@ -1,12 +1,16 @@
 package br.com.artheus.kairos.shared.scheduler;
 
-import br.com.artheus.kairos.climate.ClimateService;
+import br.com.artheus.kairos.climate.ClimateProducer;
 import br.com.artheus.kairos.plan.PlanService;
-import br.com.artheus.kairos.risk.RiskEngine;
+import br.com.artheus.kairos.shared.contract.cities.CityLocation;
+import br.com.artheus.kairos.shared.contract.cities.CityProvider;
+import br.com.artheus.kairos.shared.contract.climate.ClimateFetchRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
+
+import java.util.List;
 
 @Component
 @RequiredArgsConstructor
@@ -14,8 +18,8 @@ import org.springframework.stereotype.Component;
 public class KairosScheduler {
 
     private final PlanService planService;
-    private final ClimateService climateService;
-    private final RiskEngine riskEngine;
+    private final CityProvider cityProvider;
+    private final ClimateProducer climateProducer;
 
     @Scheduled(fixedRateString = "${config.scheduler.plans-interval}")
     public void checkExpiredPlans() {
@@ -28,9 +32,17 @@ public class KairosScheduler {
 
     @Scheduled(fixedRateString = "${config.scheduler.climate-interval}")
     public void fetchClimateData() {
-        log.info("Starting climate data fetch and risk calculation...");
-        climateService.fetchClimateDataForAllCities();
-        riskEngine.calculateRiskForAllCities();
-        log.info("Climate data fetch and risk calculation finished.");
+
+        log.info("fetchClimateData triggered");
+
+        List<CityLocation> activeCities = cityProvider.findActiveCities();
+
+        for (CityLocation cityLocation : activeCities) {
+
+            climateProducer.publishClimateData(new ClimateFetchRequest(cityLocation.id(), cityLocation.latitude(), cityLocation.longitude()));
+
+            log.info("Climate data fetch requested for city ID: {}", cityLocation.id());
+        }
     }
+
 }

@@ -1,10 +1,13 @@
 package br.com.artheus.kairos.climate;
 
 import br.com.artheus.kairos.cities.City;
+import br.com.artheus.kairos.cities.CityRepository;
 import br.com.artheus.kairos.shared.contract.cities.CityLocation;
 import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataWriter;
+import br.com.artheus.kairos.shared.contract.risk.RiskMessage;
 import br.com.artheus.kairos.shared.contract.risk.RiskProvider;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
@@ -22,9 +25,10 @@ import java.util.List;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class ClimateService implements ClimateDataProvider, RiskProvider {
+public class ClimateService implements ClimateDataProvider, RiskProvider, ClimateDataWriter {
 
     private final CityProvider cityProvider;
+    private final CityRepository cityRepository;
 
     private final OpenMeteoClient openMeteoClient;
 
@@ -77,6 +81,21 @@ public class ClimateService implements ClimateDataProvider, RiskProvider {
                 .orElseThrow(() -> new ResourceNotFoundException("This city has no climate data"));
 
         climateData.updateRiskLevel(riskLevel);
+
+        climateDataRepository.save(climateData);
+    }
+
+    public void saveClimateData(RiskMessage message) {
+        City cityReference = cityRepository.getReferenceById(message.cityId());
+
+        ClimateData climateData = ClimateData.builder()
+                .city(cityReference)
+                .temperature(message.temperature())
+                .humidity(message.humidity())
+                .rainVolume(message.rainVolume())
+                .windSpeed(message.windSpeed())
+                .collectedAt(LocalDateTime.now())
+                .build();
 
         climateDataRepository.save(climateData);
     }

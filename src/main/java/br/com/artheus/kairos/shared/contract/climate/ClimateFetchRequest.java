@@ -1,4 +1,8 @@
 package br.com.artheus.kairos.shared.contract.climate;
 
-public record ClimateFetchRequest() {
+public record ClimateFetchRequest(
+        String cityId,
+        Double latitude,
+        Double longitude
+) {
 }

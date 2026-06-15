@@ -1,3 +1,5 @@
+version: '3.8'
+
 services:
   mysql:
     image: mysql:8.0
@@ -11,7 +13,7 @@ services:
       - "${DB_PORT}:3306"
     volumes:
       - mysql_data:/var/lib/mysql
-      - ./mysql/init:/docker-entrypoint-initdb.d  # <- adiciona isso
+      - ./mysql/init:/docker-entrypoint-initdb.d
     networks:
       - kairos-network
     healthcheck:
@@ -30,7 +32,7 @@ services:
     networks:
       - kairos-network
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: [ "CMD", "redis-cli", "ping" ]
       interval: 10s
       timeout: 5s
       retries: 5
@@ -58,9 +60,29 @@ services:
     networks:
       - kairos-network
 
+  rabbitmq:
+    image: rabbitmq:3.13-management
+    container_name: kairos-rabbitmq
+    ports:
+      - "${RABBITMQ_PORT}:5672"   # AMQP protocol port (for microservices connection)
+      - "${RABBITMQ_INTERFACE_PORT}:15672" # Web management interface port (Dashboard)
+    environment:
+      - RABBITMQ_DEFAULT_USER=${RABBITMQ_USERNAME}
+      - RABBITMQ_DEFAULT_PASS=${RABBITMQ_PASSWORD}
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - kairos-network
+    healthcheck:
+      test: [ "CMD", "rabbitmq-diagnostics", "check_running" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
 volumes:
   mysql_data:
   redis_data:
+  rabbitmq_data:
 
 networks:
   kairos-network:

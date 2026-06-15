@@ -1,9 +1,9 @@
 package br.com.artheus.kairos.shared.contract.risk;
 
-public record CalculatedRiskMessage(
+public record RiskMessage(
         String cityId,
         double temperature,
-        double humidity,
+        int humidity,
         double rainVolume,
         double windSpeed
 ) {
