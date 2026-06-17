@@ -71,6 +71,12 @@ public class MonitoredCityService implements CityProvider {
                 .collect(Collectors.toList());
     }
 
+    @Override
+    public CityLocation findCityById(String cityId) {
+        City city = fetchCityOrThrow(cityId);
+        return new CityLocation(city.getId(), city.getName(), city.getLatitude(), city.getLongitude());
+    }
+
     // ==========================================
     // Aux Methods
     // ==========================================
