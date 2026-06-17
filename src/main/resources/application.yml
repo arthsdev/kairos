@@ -33,6 +33,11 @@ spring:
     username: ${RABBITMQ_USERNAME}
     password: ${RABBITMQ_PASSWORD}
 
+
+    discord:
+      webhook:
+        url: ${DISCORD_WEBHOOK_URL}
+
   security:
     oauth2:
       resourceserver:

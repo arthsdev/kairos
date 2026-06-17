@@ -1,7 +1,10 @@
 package br.com.artheus.kairos.risk;
 
 import br.com.artheus.kairos.shared.config.RabbitMQConfig;
+import br.com.artheus.kairos.shared.contract.cities.CityLocation;
+import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateInput;
+import br.com.artheus.kairos.shared.contract.notification.NotificationSender;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceDataProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.contract.risk.RiskMessage;
@@ -22,25 +25,31 @@ public class RiskConsumer {
     private final RiskCalculator riskCalculator;
     private final RiskProvider riskProvider;
     private final OccurrenceDataProvider occurrenceDataProvider;
+    private final NotificationSender notificationSender;
+    private final CityProvider cityProvider;
 
     @RabbitListener(queues = RabbitMQConfig.CALCULATE_RISK)
     public void fetchCalculatedRisk(RiskMessage riskMessage) {
 
-        List<OccurrenceSummary> occurrences = occurrenceDataProvider.findVerifiedByCityId(riskMessage.cityId());
+        List<OccurrenceSummary> occurrences =
+                occurrenceDataProvider.findVerifiedByCityId(riskMessage.cityId());
 
         ClimateInput climate = new ClimateInput(
                 riskMessage.temperature(),
                 riskMessage.humidity(),
                 riskMessage.rainVolume(),
                 riskMessage.windSpeed()
-
         );
 
         RiskLevel calculatedRisk = riskCalculator.calculate(climate, occurrences);
 
         riskProvider.saveCalculatedRisk(riskMessage.cityId(), calculatedRisk);
 
-        log.info("Risk calculated for city: {}", riskMessage.cityId());
+        if (calculatedRisk == RiskLevel.CRITICAL || calculatedRisk == RiskLevel.HIGH) {
+            CityLocation cityLocation = cityProvider.findCityById(riskMessage.cityId());
+            notificationSender.sendNotification(cityLocation.name(), calculatedRisk);
+        }
 
+        log.info("Risk calculated for city: {}", riskMessage.cityId());
     }
 }
