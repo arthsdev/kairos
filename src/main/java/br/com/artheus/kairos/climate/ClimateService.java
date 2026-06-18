@@ -2,11 +2,11 @@ package br.com.artheus.kairos.climate;
 
 import br.com.artheus.kairos.cities.City;
 import br.com.artheus.kairos.cities.CityRepository;
-import br.com.artheus.kairos.shared.contract.cities.CityLocation;
-import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
 import br.com.artheus.kairos.shared.contract.climate.ClimateDataWriter;
+import br.com.artheus.kairos.shared.contract.climate.ClimateFetchRequest;
+import br.com.artheus.kairos.shared.contract.risk.RiskCalculationPublisher;
 import br.com.artheus.kairos.shared.contract.risk.RiskMessage;
 import br.com.artheus.kairos.shared.contract.risk.RiskProvider;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
@@ -18,8 +18,6 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.ArrayList;
-import java.util.List;
 
 
 @Service
@@ -27,41 +25,14 @@ import java.util.List;
 @Slf4j
 public class ClimateService implements ClimateDataProvider, RiskProvider, ClimateDataWriter {
 
-    private final CityProvider cityProvider;
     private final CityRepository cityRepository;
+    private final RiskCalculationPublisher riskCalculationPublisher;
 
     private final OpenMeteoClient openMeteoClient;
 
     private final ClimateDataRepository climateDataRepository;
 
-    public void fetchClimateDataForAllCities() {
-        List<CityLocation> activeCities = cityProvider.findActiveCities();
-        List<ClimateData> climateDataList = new ArrayList<>();
-
-        for (CityLocation city : activeCities) {
-            try {
-                WeatherResponse weather = openMeteoClient.getWeather(city.latitude(), city.longitude());
-
-                City cityRef = City.builder()
-                        .id(city.id())
-                        .build();
-
-                climateDataList.add(ClimateData.builder()
-                        .city(cityRef)
-                        .collectedAt(LocalDateTime.now())
-                        .temperature(weather.currentWeather().temperature())
-                        .humidity(weather.currentWeather().humidity())
-                        .rainVolume(weather.currentWeather().rainVolume())
-                        .windSpeed(weather.currentWeather().windSpeed())
-                        .build());
-            } catch (Exception e) {
-                log.error("Error retrieving weather data for city: {}", city.name(), e);
-            }
-        }
-
-        climateDataRepository.saveAll(climateDataList);
-    }
-
+    @Override
     public ClimateDataSummary findLatestByCity(String cityId) {
 
         return climateDataRepository.findFirstByCityIdOrderByCollectedAtDesc(cityId)
@@ -76,6 +47,27 @@ public class ClimateService implements ClimateDataProvider, RiskProvider, Climat
                 .orElseThrow(() -> new ResourceNotFoundException("This city has no climate data"));
     }
 
+    public void processClimateFetch(ClimateFetchRequest request) {
+
+        WeatherResponse response = openMeteoClient.getWeather(request.latitude(), request.longitude());
+
+        RiskMessage riskMessage = new RiskMessage(
+                request.cityId(),
+                response.currentWeather().temperature(),
+                response.currentWeather().humidity(),
+                response.currentWeather().rainVolume(),
+                response.currentWeather().windSpeed()
+        );
+
+        this.saveClimateData(riskMessage);
+
+        riskCalculationPublisher.publish(riskMessage);
+
+        log.info("Climate data processed for city: {}", request.cityId());
+
+    }
+
+    @Override
     public void saveCalculatedRisk(String cityId, RiskLevel riskLevel) {
         ClimateData climateData = climateDataRepository.findFirstByCityIdOrderByCollectedAtDesc(cityId)
                 .orElseThrow(() -> new ResourceNotFoundException("This city has no climate data"));
@@ -85,6 +77,7 @@ public class ClimateService implements ClimateDataProvider, RiskProvider, Climat
         climateDataRepository.save(climateData);
     }
 
+    @Override
     public void saveClimateData(RiskMessage message) {
         City cityReference = cityRepository.getReferenceById(message.cityId());
 
