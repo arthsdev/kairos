@@ -1,9 +1,9 @@
 package br.com.artheus.kairos.cities;
 
-import br.com.artheus.kairos.shared.contract.cities.CityLocation;
-import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.plan.Plan;
 import br.com.artheus.kairos.plan.PlanRepository;
+import br.com.artheus.kairos.shared.contract.cities.CityLocation;
+import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ExternalServiceException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
@@ -11,16 +11,20 @@ import br.com.artheus.kairos.weather.GeocodingResponse;
 import br.com.artheus.kairos.weather.GeocodingResult;
 import br.com.artheus.kairos.weather.OpenMeteoClient;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.reactive.function.client.WebClientRequestException;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
+@Slf4j
 public class MonitoredCityService implements CityProvider {
 
     private final PlanRepository planRepository;
@@ -69,12 +73,34 @@ public class MonitoredCityService implements CityProvider {
     public List<MonitoredCityResponse> listMyCities(String userId) {
         List<UserCity> userCities = userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId);
 
+        if (userCities.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> cityIds = userCities.stream()
+                .map(UserCity::getCityId)
+                .toList();
+
+        List<City> cities = cityRepository.findAllById(cityIds);
+
+        Map<String, City> cityMap = cities.stream()
+                .collect(Collectors.toMap(City::getId, city -> city));
+
         return userCities.stream()
                 .map(userCity -> {
-                    City city = fetchCityOrThrow(userCity.getCityId());
+                    City city = cityMap.get(userCity.getCityId());
+
+                    // Validation and Inconsistency Log
+                    if (city == null) {
+                        log.error("[DATA INCONSISTENCY] UserCity with ID {} points to a non-existent cityId {} in the database!",
+                                userCity.getId(), userCity.getCityId());
+                        return null; // Temporarily returns null to be filtered below
+                    }
+
                     return MonitoredCityResponse.from(city, userCity);
                 })
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull) // Removes mappings that failed
+                .toList();
     }
 
     @Override
@@ -82,12 +108,33 @@ public class MonitoredCityService implements CityProvider {
     public List<CityLocation> findActiveCities() {
         List<UserCity> userCities = userCityRepository.findAllByActiveTrue();
 
+        if (userCities.isEmpty()) {
+            return List.of();
+        }
+
+        List<String> cityIds = userCities.stream()
+                .map(UserCity::getCityId)
+                .toList();
+
+        List<City> cities = cityRepository.findAllById(cityIds);
+
+        Map<String, City> cityMap = cities.stream()
+                .collect(Collectors.toMap(City::getId, city -> city));
+
         return userCities.stream()
                 .map(userCity -> {
-                    City city = fetchCityOrThrow(userCity.getCityId());
+                    City city = cityMap.get(userCity.getCityId());
+
+                    if (city == null) {
+                        log.error("[DATA INCONSISTENCY] Active UserCity with ID {} points to a non-existent cityId {} in the database!",
+                                userCity.getId(), userCity.getCityId());
+                        return null;
+                    }
+
                     return new CityLocation(city.getId(), city.getName(), city.getLatitude(), city.getLongitude());
                 })
-                .collect(Collectors.toList());
+                .filter(Objects::nonNull)
+                .toList();
     }
 
     @Override
