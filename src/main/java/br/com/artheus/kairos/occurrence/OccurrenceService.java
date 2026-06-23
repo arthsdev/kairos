@@ -5,7 +5,10 @@ import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
+import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,11 +41,12 @@ public class OccurrenceService implements OccurrenceDataProvider {
     }
 
     @Transactional(readOnly = true)
-    public List<OccurrenceResponse> getVerifiedOccurrences() {
-        return occurrenceRepository.findAllByStatus(OccurrenceStatus.VERIFIED)
-                .stream()
-                .map(OccurrenceResponse::from)
-                .toList();
+    public PaginatedResponse<OccurrenceResponse> getVerifiedOccurrences(Pageable pageable) {
+        Page<OccurrenceResponse> page = occurrenceRepository
+                .findAllByStatus(OccurrenceStatus.VERIFIED, pageable)
+                .map(OccurrenceResponse::from);
+
+        return new PaginatedResponse<>(page);
     }
 
     @Transactional(readOnly = true)

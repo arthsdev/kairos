@@ -1,14 +1,17 @@
 package br.com.artheus.kairos.occurrence;
 
 
+import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
+import org.springframework.data.web.PageableDefault;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 @RestController
 @RequestMapping("/api/v1/occurrences")
@@ -28,8 +31,11 @@ public class OccurrenceController {
     }
 
     @GetMapping
-    public ResponseEntity<List<OccurrenceResponse>> listVerifiedOccurrences() {
-        return ResponseEntity.ok(occurrenceService.getVerifiedOccurrences());
+    public ResponseEntity<PaginatedResponse<OccurrenceResponse>> listVerifiedOccurrences(
+            // TODO(artheus): AFTER ADDING SWAGGER ADD A @ParameterObject BEFORE PAGEABLEDEFAULT
+            @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+
+        return ResponseEntity.ok(occurrenceService.getVerifiedOccurrences(pageable));
     }
 
     @PatchMapping("/{id}")

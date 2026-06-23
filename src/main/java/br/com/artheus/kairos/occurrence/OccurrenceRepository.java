@@ -1,6 +1,8 @@
 package br.com.artheus.kairos.occurrence;
 
 import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 
 import java.util.List;
@@ -13,7 +15,7 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, String> 
 
     List<Occurrence> findByUserIdAndStatus(String userId, OccurrenceStatus status);
 
-    List<Occurrence> findAllByStatus(OccurrenceStatus status);
+    Page<Occurrence> findAllByStatus(OccurrenceStatus status, Pageable pageable);
 
     List<Occurrence> findByCityIdAndStatusIn(String cityId, List<OccurrenceStatus> statuses);
 }
