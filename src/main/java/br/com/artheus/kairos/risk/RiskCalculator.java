@@ -3,13 +3,16 @@ package br.com.artheus.kairos.risk;
 import br.com.artheus.kairos.shared.contract.climate.ClimateInput;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
+import br.com.artheus.kairos.shared.exception.BusinessException;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Component;
 
 import java.util.List;
 
 @Component
 @RequiredArgsConstructor
+@Slf4j
 public class RiskCalculator {
 
     private final RiskCalculatorProperties properties;
@@ -19,6 +22,17 @@ public class RiskCalculator {
     private static final double SCORE_MAX = 4.0;
 
     public RiskLevel calculate(ClimateInput climate, List<OccurrenceSummary> occurrences) {
+
+        if (climate == null) {
+            log.error("Cannot calculate risk: ClimateInput is null");
+            throw new BusinessException("Cannot calculate risk: ClimateInput is null");
+        }
+
+        if (occurrences == null) {
+            log.error("Cannot calculate risk: occurrences list is null");
+            throw new BusinessException("Cannot calculate risk: occurrences list is null");
+        }
+
         RiskLevel climateRisk = evaluateClimateRisk(climate);
         double climateScore = mapRiskLevelToScore(climateRisk);
 
