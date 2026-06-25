@@ -36,15 +36,30 @@ spring:
       simple:
         default-requeue-rejected: true
 
-    discord:
-      webhook:
-        url: ${DISCORD_WEBHOOK_URL}
-
   security:
     oauth2:
       resourceserver:
         jwt:
           issuer-uri: ${KEYCLOAK_URL}/realms/${KEYCLOAK_REALM}
+
+discord:
+  webhook:
+    url: ${DISCORD_WEBHOOK_URL}
+
+kairos:
+  risk-calculator:
+    climate-weight: 0.7
+    occurrence-weight: 0.3
+    occurrence-smoothing-factor: 5.0
+    thresholds:
+      rain:
+        medium: 5.0
+        high: 21.0
+        critical: 50.0
+      wind:
+        medium: 30.0
+        high: 51.0
+        critical: 80.0
 
 server:
   port: 8081
