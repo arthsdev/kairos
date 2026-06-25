@@ -1,6 +1,5 @@
 package br.com.artheus.kairos.risk;
 
-import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
 import br.com.artheus.kairos.shared.contract.climate.ClimateInput;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.enums.RiskLevel;
@@ -13,15 +12,11 @@ import java.util.List;
 @RequiredArgsConstructor
 public class RiskCalculator {
 
-    // External climate data is weighted higher than user reported occurrences
-    private static final double CLIMATE_WEIGHT = 0.7;
-    private static final double OCCURRENCE_WEIGHT = 0.3;
+    private final RiskCalculatorProperties properties;
 
+    // These values are constants because they represent strict algorithm limits
     private static final double SCORE_MIN = 1.0;
     private static final double SCORE_MAX = 4.0;
-
-    // Smoothing factor to prevent a few occurrences from maxing out the score immediately
-    private static final double OCCURRENCE_SMOOTHING_FACTOR = 5.0;
 
     public RiskLevel calculate(ClimateInput climate, List<OccurrenceSummary> occurrences) {
         RiskLevel climateRisk = evaluateClimateRisk(climate);
@@ -30,16 +25,18 @@ public class RiskCalculator {
         double totalOccurrenceScore = calculateTotalOccurrenceScore(occurrences);
         double normalizedOccurrenceScore = normalizeOccurrenceScore(totalOccurrenceScore);
 
-        double finalScore = (climateScore * CLIMATE_WEIGHT) + (normalizedOccurrenceScore * OCCURRENCE_WEIGHT);
+        double finalScore = (climateScore * properties.climateWeight()) + (normalizedOccurrenceScore * properties.occurrenceWeight());
 
         return mapScoreToRiskLevel(finalScore);
     }
 
+    private RiskLevel evaluateClimateRisk(ClimateInput climate) {
+        var rain = properties.thresholds().rain();
+        var wind = properties.thresholds().wind();
 
-    private static RiskLevel evaluateClimateRisk(ClimateInput climate) {
-        if (climate.rainVolume() >= 50.0 || climate.windSpeed() >= 80.0) return RiskLevel.CRITICAL;
-        if (climate.rainVolume() >= 21.0 || climate.windSpeed() >= 51.0) return RiskLevel.HIGH;
-        if (climate.rainVolume() >= 5.0  || climate.windSpeed() >= 30.0) return RiskLevel.MEDIUM;
+        if (climate.rainVolume() >= rain.critical() || climate.windSpeed() >= wind.critical()) return RiskLevel.CRITICAL;
+        if (climate.rainVolume() >= rain.high()     || climate.windSpeed() >= wind.high())     return RiskLevel.HIGH;
+        if (climate.rainVolume() >= rain.medium()   || climate.windSpeed() >= wind.medium())   return RiskLevel.MEDIUM;
         return RiskLevel.LOW;
     }
 
@@ -71,7 +68,7 @@ public class RiskCalculator {
         if (totalScore == 0.0) {
             return SCORE_MIN;
         }
-        return Math.min(SCORE_MAX, SCORE_MIN + (totalScore / OCCURRENCE_SMOOTHING_FACTOR));
+        return Math.min(SCORE_MAX, SCORE_MIN + (totalScore / properties.occurrenceSmoothingFactor()));
     }
 
     private double mapRiskLevelToScore(RiskLevel riskLevel) {
