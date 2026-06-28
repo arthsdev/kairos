@@ -1,5 +1,6 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
@@ -57,6 +58,28 @@ public class OccurrenceController {
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
 
         return ResponseEntity.ok(occurrenceService.getVerifiedOccurrences(pageable));
+    }
+
+    @Operation(
+            summary = "List current user occurrences",
+            description = "Retrieves a paginated list of occurrences belonging to the authenticated user, optionally filtered by status."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Successfully retrieved the list"),
+            @ApiResponse(responseCode = "401", description = "Unauthorized - Invalid or missing token")
+    })
+    @GetMapping("/me")
+    public ResponseEntity<PaginatedResponse<OccurrenceResponse>> getMyOccurrences(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
+
+            @Parameter(description = "Optional status to filter occurrences")
+            @RequestParam(required = false) OccurrenceStatus status,
+
+            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+
+        String userId = jwt.getSubject();
+
+        return ResponseEntity.ok(occurrenceService.getMyOccurrences(userId, status, pageable));
     }
 
     @PatchMapping("/{id}")
