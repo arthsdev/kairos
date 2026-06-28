@@ -18,4 +18,8 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, String> 
     Page<Occurrence> findAllByStatus(OccurrenceStatus status, Pageable pageable);
 
     List<Occurrence> findByCityIdAndStatusIn(String cityId, List<OccurrenceStatus> statuses);
+
+    Page<Occurrence> findAllByUserId(String userId, Pageable pageable);
+
+    Page<Occurrence> findAllByUserIdAndStatus(String userId, OccurrenceStatus status, Pageable pageable);
 }

@@ -49,6 +49,23 @@ public class OccurrenceService implements OccurrenceDataProvider {
         return new PaginatedResponse<>(page);
     }
 
+    //TODO: check for @Transactional(readOnly = true)
+    public PaginatedResponse<OccurrenceResponse> getMyOccurrences(String userId, OccurrenceStatus status, Pageable pageable) {
+        Page<Occurrence> occurrencePage;
+
+        if (status != null) {
+            occurrencePage = occurrenceRepository.findAllByUserIdAndStatus(userId, status, pageable);
+        } else {
+            occurrencePage = occurrenceRepository.findAllByUserId(userId, pageable);
+        }
+
+        // 1. Maps the entity page to a DTO page
+        Page<OccurrenceResponse> responsePage = occurrencePage.map(OccurrenceResponse::from);
+
+        // 2. Wraps the DTO page into the custom PaginatedResponse
+        return new PaginatedResponse<>(responsePage);
+    }
+
     @Transactional(readOnly = true)
     public List<OccurrenceSummary> findVerifiedByCityId(String cityId) {
         List<Occurrence> verifiedCurrencies = occurrenceRepository.findByCityIdAndStatusIn(
