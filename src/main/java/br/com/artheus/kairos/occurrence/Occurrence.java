@@ -75,17 +75,19 @@ public class Occurrence {
     }
 
     public void changeTitle(String title) {
-        ensureNotFinalizedForUpdate();
+        this.ensureNotDeletedForUpdate();
+        this.ensureNotFinalizedForUpdate();
         this.title = title;
     }
 
     public void changeDescription(String description) {
-        ensureNotFinalizedForUpdate();
+        this.ensureNotDeletedForUpdate();
+        this.ensureNotFinalizedForUpdate();
         this.description = description;
     }
 
     public void delete() {
-        if (this.deletedAt != null) {
+        if (this.isDeleted()) {
             throw new BusinessException("You can't delete this occurrence.");
         }
         ensureNotFinalizedForDeletion();
@@ -94,6 +96,16 @@ public class Occurrence {
 
     public boolean isFinalized() {
         return this.status == OccurrenceStatus.VERIFIED || this.status == OccurrenceStatus.RESOLVED;
+    }
+
+    public boolean isDeleted() {
+        return this.deletedAt != null;
+    }
+
+    private void ensureNotDeletedForUpdate() {
+        if (this.isDeleted()) {
+            throw new BusinessException("Cannot update the occurrence because it has been deleted.");
+        }
     }
 
     private void ensureNotFinalizedForUpdate() {
