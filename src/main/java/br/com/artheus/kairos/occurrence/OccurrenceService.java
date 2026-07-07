@@ -2,8 +2,9 @@ package br.com.artheus.kairos.occurrence;
 
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceDataProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
+import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
-import br.com.artheus.kairos.shared.exception.BusinessException;
+import br.com.artheus.kairos.shared.exception.ForbiddenException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import lombok.RequiredArgsConstructor;
@@ -19,6 +20,7 @@ import java.util.List;
 public class OccurrenceService implements OccurrenceDataProvider {
 
     private final OccurrenceRepository occurrenceRepository;
+    private final SecurityService securityService;
 
     @Transactional
     public OccurrenceResponse createOccurrence(OccurrenceRequest request, String userId) {
@@ -49,7 +51,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
         return new PaginatedResponse<>(page);
     }
 
-    //TODO: check for @Transactional(readOnly = true)
+    @Transactional(readOnly = true)
     public PaginatedResponse<OccurrenceResponse> getMyOccurrences(String userId, OccurrenceStatus status, Pageable pageable) {
         Page<Occurrence> occurrencePage;
 
@@ -83,41 +85,42 @@ public class OccurrenceService implements OccurrenceDataProvider {
     }
 
     @Transactional
-    public OccurrenceResponse updateOccurrence(String id, OccurrenceRequest request, String userId) {
-
+    public OccurrenceResponse updateOccurrence(String id, OccurrenceRequest request) {
         Occurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
 
-        if (!occurrence.getUserId().equals(userId)) {
-            throw new BusinessException("You can't update the occurrence");
+        String currentUserId = securityService.getCurrentUserId();
+        boolean isAdmin = securityService.isAdmin();
+
+        if (!occurrence.getUserId().equals(currentUserId) && !isAdmin) {
+            throw new ForbiddenException("You can't update the occurrence");
         }
 
         if (request.title() != null) occurrence.changeTitle(request.title());
         if (request.description() != null) occurrence.changeDescription(request.description());
 
         occurrenceRepository.save(occurrence);
+
         return OccurrenceResponse.from(occurrence);
     }
 
     @Transactional
-    public OccurrenceResponse deleteOccurrence(String id, String userId) {
+    public OccurrenceResponse deleteOccurrence(String id) {
 
         Occurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
 
-            if (!occurrence.getUserId().equals(userId)) {
-                throw new BusinessException("You can't delete the occurrence");
-            }
+        String currentUserId = securityService.getCurrentUserId();
+        boolean isAdmin = securityService.isAdmin();
 
-        if (occurrence.getDeletedAt() != null) {
-            throw new BusinessException("Occurrence already deleted");
+        if (!occurrence.getUserId().equals(currentUserId) && !isAdmin) {
+            throw new ForbiddenException("You can't delete the occurrence");
         }
 
         occurrence.delete();
         occurrenceRepository.save(occurrence);
 
         return OccurrenceResponse.from(occurrence);
-
-        }
     }
+}
 
