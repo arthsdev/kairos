@@ -60,13 +60,6 @@ public class Occurrence {
     @Column(name = "city_id", nullable = false)
     private String cityId;
 
-    public void delete() {
-        if (this.deletedAt != null) {
-           throw new BusinessException("You can't delete this occurrence.");
-        }
-        this.deletedAt = LocalDateTime.now();
-    }
-
     public void verify() {
         if (this.status != OccurrenceStatus.PENDING) {
             throw new BusinessException("Only pending occurrences can be verified");
@@ -81,19 +74,38 @@ public class Occurrence {
         this.status = OccurrenceStatus.RESOLVED;
     }
 
-    private void validateEditable() {
-        if (this.status == OccurrenceStatus.VERIFIED || this.status == OccurrenceStatus.RESOLVED) {
-            throw new BusinessException("Only pending occurrences can be edited");
+    public void changeTitle(String title) {
+        ensureNotFinalizedForUpdate();
+        this.title = title;
+    }
+
+    public void changeDescription(String description) {
+        ensureNotFinalizedForUpdate();
+        this.description = description;
+    }
+
+    public void delete() {
+        if (this.deletedAt != null) {
+            throw new BusinessException("You can't delete this occurrence.");
+        }
+        ensureNotFinalizedForDeletion();
+        this.deletedAt = LocalDateTime.now();
+    }
+
+    public boolean isFinalized() {
+        return this.status == OccurrenceStatus.VERIFIED || this.status == OccurrenceStatus.RESOLVED;
+    }
+
+    private void ensureNotFinalizedForUpdate() {
+        if (this.isFinalized()) {
+            throw new BusinessException("Cannot update the occurrence because it has already been finalized.");
         }
     }
 
-    public void changeTitle(String title) {
-        validateEditable();
-        this.title = title;
-    }
-    public void changeDescription(String description) {
-        validateEditable();
-        this.description = description;
+    private void ensureNotFinalizedForDeletion() {
+        if (this.isFinalized()) {
+            throw new BusinessException("Cannot delete the occurrence because it has already been finalized.");
+        }
     }
 
     @PrePersist

@@ -71,14 +71,11 @@ public class OccurrenceController {
     @GetMapping("/me")
     public ResponseEntity<PaginatedResponse<OccurrenceResponse>> getMyOccurrences(
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
-
             @Parameter(description = "Optional status to filter occurrences")
             @RequestParam(required = false) OccurrenceStatus status,
-
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
 
         String userId = jwt.getSubject();
-
         return ResponseEntity.ok(occurrenceService.getMyOccurrences(userId, status, pageable));
     }
 
@@ -96,10 +93,9 @@ public class OccurrenceController {
     })
     public ResponseEntity<OccurrenceResponse> updateOccurrence(
             @PathVariable String id,
-            @Valid @RequestBody OccurrenceRequest request,
-            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
-        String userId = jwt.getSubject();
-        return ResponseEntity.ok(occurrenceService.updateOccurrence(id, request, userId));
+            @Valid @RequestBody OccurrenceRequest request) {
+
+        return ResponseEntity.ok(occurrenceService.updateOccurrence(id, request));
     }
 
     @DeleteMapping("/{id}")
@@ -108,17 +104,16 @@ public class OccurrenceController {
             description = "Soft-deletes an occurrence by setting its deletion timestamp."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "204", description = "Occurrence deleted successfully (No content)"),
+            @ApiResponse(responseCode = "200", description = "Occurrence deleted successfully"),
             @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token"),
             @ApiResponse(responseCode = "403", description = "User does not have permission to delete this occurrence"),
-            @ApiResponse(responseCode = "404", description = "Occurrence not found with the provided ID")
+            @ApiResponse(responseCode = "404", description = "Occurrence not found with the provided ID"),
+            @ApiResponse(
+                    responseCode = "422",
+                    description = "The occurrence cannot be deleted because it has already been deleted or finalized (status VERIFIED or RESOLVED)."
+            )
     })
-    public ResponseEntity<Void> deleteOccurrence(
-            @PathVariable String id,
-            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
-        String userId = jwt.getSubject();
-        occurrenceService.deleteOccurrence(id, userId);
-
-        return ResponseEntity.noContent().build();
+    public ResponseEntity<OccurrenceResponse> deleteOccurrence(@PathVariable String id) {
+        return ResponseEntity.ok(occurrenceService.deleteOccurrence(id));
     }
 }
