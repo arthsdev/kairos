@@ -9,12 +9,6 @@ import java.util.List;
 
 public interface OccurrenceRepository extends JpaRepository<Occurrence, String> {
 
-    List<Occurrence> findByUserId(String userId);
-
-    List<Occurrence> findAllByOrderByCreatedAtDesc();
-
-    List<Occurrence> findByUserIdAndStatus(String userId, OccurrenceStatus status);
-
     Page<Occurrence> findAllByStatusAndDeletedAtIsNull(OccurrenceStatus status, Pageable pageable);
 
     List<Occurrence> findByCityIdAndStatusInAndDeletedAtIsNull(String cityId, List<OccurrenceStatus> statuses);
