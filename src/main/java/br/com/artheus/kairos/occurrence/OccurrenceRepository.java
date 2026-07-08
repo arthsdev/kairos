@@ -15,11 +15,11 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, String> 
 
     List<Occurrence> findByUserIdAndStatus(String userId, OccurrenceStatus status);
 
-    Page<Occurrence> findAllByStatus(OccurrenceStatus status, Pageable pageable);
+    Page<Occurrence> findAllByStatusAndDeletedAtIsNull(OccurrenceStatus status, Pageable pageable);
 
-    List<Occurrence> findByCityIdAndStatusIn(String cityId, List<OccurrenceStatus> statuses);
+    List<Occurrence> findByCityIdAndStatusInAndDeletedAtIsNull(String cityId, List<OccurrenceStatus> statuses);
 
-    Page<Occurrence> findAllByUserId(String userId, Pageable pageable);
+    Page<Occurrence> findAllByUserIdAndDeletedAtIsNull(String userId, Pageable pageable);
 
-    Page<Occurrence> findAllByUserIdAndStatus(String userId, OccurrenceStatus status, Pageable pageable);
+    Page<Occurrence> findAllByUserIdAndStatusAndDeletedAtIsNull(String userId, OccurrenceStatus status, Pageable pageable);
 }

@@ -45,7 +45,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
     @Transactional(readOnly = true)
     public PaginatedResponse<OccurrenceResponse> getVerifiedOccurrences(Pageable pageable) {
         Page<OccurrenceResponse> page = occurrenceRepository
-                .findAllByStatus(OccurrenceStatus.VERIFIED, pageable)
+                .findAllByStatusAndDeletedAtIsNull(OccurrenceStatus.VERIFIED, pageable)
                 .map(OccurrenceResponse::from);
 
         return new PaginatedResponse<>(page);
@@ -56,9 +56,9 @@ public class OccurrenceService implements OccurrenceDataProvider {
         Page<Occurrence> occurrencePage;
 
         if (status != null) {
-            occurrencePage = occurrenceRepository.findAllByUserIdAndStatus(userId, status, pageable);
+            occurrencePage = occurrenceRepository.findAllByUserIdAndStatusAndDeletedAtIsNull(userId, status, pageable);
         } else {
-            occurrencePage = occurrenceRepository.findAllByUserId(userId, pageable);
+            occurrencePage = occurrenceRepository.findAllByUserIdAndDeletedAtIsNull(userId, pageable);
         }
 
         // 1. Maps the entity page to a DTO page
@@ -70,7 +70,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
     @Transactional(readOnly = true)
     public List<OccurrenceSummary> findVerifiedByCityId(String cityId) {
-        List<Occurrence> verifiedCurrencies = occurrenceRepository.findByCityIdAndStatusIn(
+        List<Occurrence> verifiedCurrencies = occurrenceRepository.findByCityIdAndStatusInAndDeletedAtIsNull(
                 cityId,
                 List.of(OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED)
         );
