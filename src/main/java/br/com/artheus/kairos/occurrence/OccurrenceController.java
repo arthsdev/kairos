@@ -93,7 +93,7 @@ public class OccurrenceController {
     })
     public ResponseEntity<OccurrenceResponse> updateOccurrence(
             @PathVariable String id,
-            @Valid @RequestBody OccurrenceRequest request) {
+            @Valid @RequestBody UpdateOccurrenceRequest request) {
 
         return ResponseEntity.ok(occurrenceService.updateOccurrence(id, request));
     }

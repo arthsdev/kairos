@@ -85,7 +85,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
     }
 
     @Transactional
-    public OccurrenceResponse updateOccurrence(String id, OccurrenceRequest request) {
+    public OccurrenceResponse updateOccurrence(String id, UpdateOccurrenceRequest request) {
         Occurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
 
