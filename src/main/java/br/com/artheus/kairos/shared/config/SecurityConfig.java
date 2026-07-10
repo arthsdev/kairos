@@ -48,6 +48,10 @@ public class SecurityConfig {
                                 "/v3/api-docs"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/occurrences").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST,
+                                "/api/v1/occurrences/*/verify",
+                                "/api/v1/occurrences/*/resolve"
+                        ).hasRole("ADMIN")
                         .anyRequest().authenticated()
                 )
                 .oauth2ResourceServer(oauth2 -> oauth2

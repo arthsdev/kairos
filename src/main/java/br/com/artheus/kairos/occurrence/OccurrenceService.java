@@ -105,6 +105,40 @@ public class OccurrenceService implements OccurrenceDataProvider {
     }
 
     @Transactional
+    public OccurrenceResponse verifyOccurrence(String id) {
+        Occurrence occurrence = occurrenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
+
+        boolean isAdmin = securityService.isAdmin();
+
+        if (!isAdmin) {
+            throw new ForbiddenException("Only admins can verify occurrences");
+        }
+
+        occurrence.verify();
+        occurrenceRepository.save(occurrence);
+
+        return OccurrenceResponse.from(occurrence);
+    }
+
+    @Transactional
+    public OccurrenceResponse resolveOccurrence(String id) {
+        Occurrence occurrence = occurrenceRepository.findById(id)
+                .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
+
+        boolean isAdmin = securityService.isAdmin();
+
+        if (!isAdmin) {
+            throw new ForbiddenException("Only admins can resolve occurrences");
+        }
+
+        occurrence.resolve();
+        occurrenceRepository.save(occurrence);
+
+        return OccurrenceResponse.from(occurrence);
+    }
+
+    @Transactional
     public OccurrenceResponse deleteOccurrence(String id) {
 
         Occurrence occurrence = occurrenceRepository.findById(id)
