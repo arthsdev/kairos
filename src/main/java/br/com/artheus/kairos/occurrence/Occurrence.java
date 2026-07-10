@@ -61,6 +61,7 @@ public class Occurrence {
     private String cityId;
 
     public void verify() {
+        this.ensureNotDeleted();
         if (this.status != OccurrenceStatus.PENDING) {
             throw new BusinessException("Only pending occurrences can be verified");
         }
@@ -68,6 +69,7 @@ public class Occurrence {
     }
 
     public void resolve() {
+        this.ensureNotDeleted();
         if (this.status != OccurrenceStatus.VERIFIED) {
             throw new BusinessException("Only verified occurrences can be resolved");
         }
@@ -75,13 +77,13 @@ public class Occurrence {
     }
 
     public void changeTitle(String title) {
-        this.ensureNotDeletedForUpdate();
+        this.ensureNotDeleted();
         this.ensureNotFinalizedForUpdate();
         this.title = title;
     }
 
     public void changeDescription(String description) {
-        this.ensureNotDeletedForUpdate();
+        this.ensureNotDeleted();
         this.ensureNotFinalizedForUpdate();
         this.description = description;
     }
@@ -102,9 +104,9 @@ public class Occurrence {
         return this.deletedAt != null;
     }
 
-    private void ensureNotDeletedForUpdate() {
+    private void ensureNotDeleted() {
         if (this.isDeleted()) {
-            throw new BusinessException("Cannot update the occurrence because it has been deleted.");
+            throw new BusinessException("Cannot perform this action on a deleted occurrence.");
         }
     }
 

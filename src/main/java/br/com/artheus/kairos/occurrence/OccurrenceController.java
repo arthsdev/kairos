@@ -98,6 +98,38 @@ public class OccurrenceController {
         return ResponseEntity.ok(occurrenceService.updateOccurrence(id, request));
     }
 
+    @PostMapping("/{id}/verify")
+    @Operation(
+            summary = "Verify an occurrence",
+            description = "Transitions the occurrence state to VERIFIED. This action requires administrative privileges."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Occurrence verified successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Only administrators can verify occurrences"),
+            @ApiResponse(responseCode = "404", description = "Occurrence not found with the provided ID"),
+            @ApiResponse(responseCode = "422", description = "Occurrence is soft-deleted or already verified")
+    })
+    public ResponseEntity<OccurrenceResponse> verifyOccurrence(@PathVariable String id) {
+        return ResponseEntity.ok(occurrenceService.verifyOccurrence(id));
+    }
+
+    @PostMapping("/{id}/resolve")
+    @Operation(
+            summary = "Resolve an occurrence",
+            description = "Transitions the occurrence state to RESOLVED. This action requires administrative privileges and the occurrence must be verified."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Occurrence resolved successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated"),
+            @ApiResponse(responseCode = "403", description = "Only administrators can resolve occurrences"),
+            @ApiResponse(responseCode = "404", description = "Occurrence not found with the provided ID"),
+            @ApiResponse(responseCode = "422", description = "Occurrence must be VERIFIED to be resolved")
+    })
+    public ResponseEntity<OccurrenceResponse> resolveOccurrence(@PathVariable String id) {
+        return ResponseEntity.ok(occurrenceService.resolveOccurrence(id));
+    }
+
     @DeleteMapping("/{id}")
     @Operation(
             summary = "Soft-delete an occurrence",
