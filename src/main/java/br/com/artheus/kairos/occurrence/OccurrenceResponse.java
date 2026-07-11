@@ -19,10 +19,11 @@ public record OccurrenceResponse(
         String imageUrl,
         String userId,
         LocalDateTime createdAt,
-        String cityId
+        String cityId,
+        OccurrenceActions actions
 ) {
 
-    public static OccurrenceResponse from(Occurrence occurrence) {
+    public static OccurrenceResponse from(Occurrence occurrence, OccurrenceActions actions) {
         return new OccurrenceResponse(
                 occurrence.getId(),
                 occurrence.getTitle(),
@@ -35,7 +36,8 @@ public record OccurrenceResponse(
                 occurrence.getImageUrl(),
                 occurrence.getUserId(),
                 occurrence.getCreatedAt(),
-                occurrence.getCityId()
+                occurrence.getCityId(),
+                actions
         );
     }
 }

@@ -21,6 +21,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
     private final OccurrenceRepository occurrenceRepository;
     private final SecurityService securityService;
+    private final OccurrenceActionsCalculator occurrenceActionsCalculator;
 
     @Transactional
     public OccurrenceResponse createOccurrence(OccurrenceRequest request, String userId) {
@@ -39,14 +40,25 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
         occurrenceRepository.save(occurrence);
 
-        return OccurrenceResponse.from(occurrence);
+        boolean isAdmin = securityService.isAdmin();
+        OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, userId, isAdmin);
+
+        return OccurrenceResponse.from(occurrence, actions);
     }
 
     @Transactional(readOnly = true)
     public PaginatedResponse<OccurrenceResponse> getVerifiedOccurrences(Pageable pageable) {
+
+        String currentUserId = securityService.getCurrentUserId();
+        boolean isAdmin = securityService.isAdmin();
+
         Page<OccurrenceResponse> page = occurrenceRepository
                 .findAllByStatusAndDeletedAtIsNull(OccurrenceStatus.VERIFIED, pageable)
-                .map(OccurrenceResponse::from);
+                .map(occurrence ->
+                        OccurrenceResponse.from(
+                                occurrence,
+                                occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin)
+                        ));
 
         return new PaginatedResponse<>(page);
     }
@@ -61,10 +73,16 @@ public class OccurrenceService implements OccurrenceDataProvider {
             occurrencePage = occurrenceRepository.findAllByUserIdAndDeletedAtIsNull(userId, pageable);
         }
 
-        // 1. Maps the entity page to a DTO page
-        Page<OccurrenceResponse> responsePage = occurrencePage.map(OccurrenceResponse::from);
+        boolean isAdmin = securityService.isAdmin();
 
-        // 2. Wraps the DTO page into the custom PaginatedResponse
+        // Maps the entity page to DTOs using lambda with the calculator
+        Page<OccurrenceResponse> responsePage = occurrencePage.map(occurrence ->
+                OccurrenceResponse.from(
+                        occurrence,
+                        occurrenceActionsCalculator.calculate(occurrence, userId, isAdmin)
+                )
+        );
+
         return new PaginatedResponse<>(responsePage);
     }
 
@@ -101,7 +119,9 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
         occurrenceRepository.save(occurrence);
 
-        return OccurrenceResponse.from(occurrence);
+        OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin);
+
+        return OccurrenceResponse.from(occurrence, actions);
     }
 
     @Transactional
@@ -109,6 +129,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
         Occurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
 
+        String currentUserId = securityService.getCurrentUserId();
         boolean isAdmin = securityService.isAdmin();
 
         if (!isAdmin) {
@@ -118,7 +139,9 @@ public class OccurrenceService implements OccurrenceDataProvider {
         occurrence.verify();
         occurrenceRepository.save(occurrence);
 
-        return OccurrenceResponse.from(occurrence);
+        OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin);
+
+        return OccurrenceResponse.from(occurrence, actions);
     }
 
     @Transactional
@@ -126,6 +149,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
         Occurrence occurrence = occurrenceRepository.findById(id)
                 .orElseThrow(() -> new ResourceNotFoundException("Occurrence not found"));
 
+        String currentUserId = securityService.getCurrentUserId();
         boolean isAdmin = securityService.isAdmin();
 
         if (!isAdmin) {
@@ -135,7 +159,9 @@ public class OccurrenceService implements OccurrenceDataProvider {
         occurrence.resolve();
         occurrenceRepository.save(occurrence);
 
-        return OccurrenceResponse.from(occurrence);
+        OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin);
+
+        return OccurrenceResponse.from(occurrence, actions);
     }
 
     @Transactional
@@ -154,7 +180,9 @@ public class OccurrenceService implements OccurrenceDataProvider {
         occurrence.delete();
         occurrenceRepository.save(occurrence);
 
-        return OccurrenceResponse.from(occurrence);
+        OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin);
+
+        return OccurrenceResponse.from(occurrence, actions);
     }
 }
 
