@@ -1,13 +1,14 @@
 package br.com.artheus.kairos.shared.config;
 
+import br.com.artheus.kairos.plan.PlanService;
 import br.com.artheus.kairos.plan.filter.PlanFirstAccessFilter;
 import br.com.artheus.kairos.shared.security.KairosAccessDeniedHandler;
 import br.com.artheus.kairos.shared.security.KeycloakRoleConverter;
 import lombok.RequiredArgsConstructor;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.data.redis.core.StringRedisTemplate;
 import org.springframework.http.HttpMethod;
-import org.springframework.security.config.Customizer;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configuration.EnableWebSecurity;
 import org.springframework.security.config.http.SessionCreationPolicy;
@@ -20,7 +21,8 @@ import org.springframework.security.web.SecurityFilterChain;
 @RequiredArgsConstructor
 public class SecurityConfig {
 
-    private final PlanFirstAccessFilter planFirstAccessFilter;
+    private final PlanService planService;
+    private final StringRedisTemplate redisTemplate;
     private final KairosAccessDeniedHandler accessDeniedHandler;
 
     @Bean
@@ -31,12 +33,17 @@ public class SecurityConfig {
     }
 
     @Bean
+    public PlanFirstAccessFilter planFirstAccessFilter() {
+        return new PlanFirstAccessFilter(planService, redisTemplate);
+    }
+
+    @Bean
     public SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
         http
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterAfter(planFirstAccessFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(planFirstAccessFilter(), BearerTokenAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .accessDeniedHandler(accessDeniedHandler)
                 )
