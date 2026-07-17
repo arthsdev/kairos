@@ -11,6 +11,7 @@ import io.lettuce.core.codec.StringCodec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 
 /**
  * Dedicated Lettuce connection for Bucket4j (distributed rate limiting via Redis).
@@ -20,6 +21,7 @@ import org.springframework.context.annotation.Configuration;
  * ({@link StatefulRedisConnection}), bypassing the Spring Data Redis abstraction layer.
  */
 @Configuration
+@Profile("!test")
 public class RateLimitConfig {
 
     @Value("${spring.data.redis.host}")
