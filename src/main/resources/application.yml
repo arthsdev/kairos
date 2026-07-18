@@ -60,6 +60,8 @@ kairos:
         medium: 30.0
         high: 51.0
         critical: 80.0
+  plan:
+    cache-ttl: PT24H
 
 server:
   port: 8081
