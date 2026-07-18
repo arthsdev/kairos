@@ -6,6 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -69,10 +70,16 @@ public class PlanService {
     @Transactional
     public void ensurePlanExists(String userId) {
         if (!planRepository.existsByUserId(userId)) {
-            Plan plan = Plan.builder()
-                    .userId(userId)
-                    .build();
-            planRepository.save(plan);
+            try {
+                Plan plan = Plan.builder()
+                        .userId(userId)
+                        .build();
+
+                planRepository.saveAndFlush(plan);
+
+            } catch (DataIntegrityViolationException ex) {
+                log.info("Plan creation race condition detected for user: {}. Plan already persisted concurrently.", userId);
+            }
         }
     }
 }

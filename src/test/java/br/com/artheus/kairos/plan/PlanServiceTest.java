@@ -2,6 +2,7 @@ package br.com.artheus.kairos.plan;
 
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -187,7 +188,7 @@ class PlanServiceTest {
     class EnsurePlanExistsTests {
 
         @Test
-        @DisplayName("Should create and save a default trial plan when user does not have one")
+        @DisplayName("Should create and saveAndFlush a default trial plan when user does not have one")
         void shouldCreatePlanWhenUserHasNone() {
             String userId = "user-new";
             when(planRepository.existsByUserId(userId)).thenReturn(false);
@@ -195,7 +196,7 @@ class PlanServiceTest {
             planService.ensurePlanExists(userId);
 
             ArgumentCaptor<Plan> planCaptor = ArgumentCaptor.forClass(Plan.class);
-            verify(planRepository, times(1)).save(planCaptor.capture());
+            verify(planRepository, times(1)).saveAndFlush(planCaptor.capture());
             assertThat(planCaptor.getValue().getUserId()).isEqualTo(userId);
         }
 
@@ -207,7 +208,21 @@ class PlanServiceTest {
 
             planService.ensurePlanExists(userId);
 
-            verify(planRepository, never()).save(any(Plan.class));
+            verify(planRepository, never()).saveAndFlush(any(Plan.class));
+        }
+
+        @Test
+        @DisplayName("Should handle race condition and complete gracefully when unique constraint is triggered")
+        void shouldTreatRaceConditionAsNoOpWhenConstraintViolationOccurs() {
+            String userId = "user-concurrent";
+            when(planRepository.existsByUserId(userId)).thenReturn(false);
+
+            when(planRepository.saveAndFlush(any(Plan.class)))
+                    .thenThrow(new DataIntegrityViolationException("Duplicate key value violates unique constraint"));
+
+            planService.ensurePlanExists(userId);
+
+            verify(planRepository, times(1)).saveAndFlush(any(Plan.class));
         }
     }
 }
