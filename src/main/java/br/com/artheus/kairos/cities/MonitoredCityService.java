@@ -64,7 +64,7 @@ public class MonitoredCityService implements CityProvider {
 
         validateUniqueMonitoring(userId, city.getId());
 
-        UserCity userCity = saveUserCityAssociation(userId, city.getId());
+        UserCity userCity = saveUserCityAssociation(userId, city);
 
         return MonitoredCityResponse.from(city, userCity);
     }
@@ -78,7 +78,7 @@ public class MonitoredCityService implements CityProvider {
         }
 
         List<String> cityIds = userCities.stream()
-                .map(UserCity::getCityId)
+                .map(userCity -> userCity.getCity().getId())
                 .toList();
 
         List<City> cities = cityRepository.findAllById(cityIds);
@@ -88,12 +88,12 @@ public class MonitoredCityService implements CityProvider {
 
         return userCities.stream()
                 .map(userCity -> {
-                    City city = cityMap.get(userCity.getCityId());
+                    City city = cityMap.get(userCity.getCity().getId());
 
                     // Validation and Inconsistency Log
                     if (city == null) {
                         log.error("[DATA INCONSISTENCY] UserCity with ID {} points to a non-existent cityId {} in the database!",
-                                userCity.getId(), userCity.getCityId());
+                                userCity.getId(), userCity.getCity().getId()  );
                         return null; // Temporarily returns null to be filtered below
                     }
 
@@ -113,7 +113,7 @@ public class MonitoredCityService implements CityProvider {
         }
 
         List<String> cityIds = userCities.stream()
-                .map(UserCity::getCityId)
+                .map(userCity -> userCity.getCity().getId())   // <- mesma mudança
                 .toList();
 
         List<City> cities = cityRepository.findAllById(cityIds);
@@ -123,11 +123,11 @@ public class MonitoredCityService implements CityProvider {
 
         return userCities.stream()
                 .map(userCity -> {
-                    City city = cityMap.get(userCity.getCityId());
+                    City city = cityMap.get(userCity.getCity().getId());
 
                     if (city == null) {
                         log.error("[DATA INCONSISTENCY] Active UserCity with ID {} points to a non-existent cityId {} in the database!",
-                                userCity.getId(), userCity.getCityId());
+                                userCity.getId(), userCity.getCity().getId());
                         return null;
                     }
 
@@ -192,10 +192,10 @@ public class MonitoredCityService implements CityProvider {
         }
     }
 
-    private UserCity saveUserCityAssociation(String userId, String cityId) {
+    private UserCity saveUserCityAssociation(String userId, City city) {
         UserCity userCity = UserCity.builder()
                 .userId(userId)
-                .cityId(cityId)
+                .city(city)
                 .build();
         return userCityRepository.save(userCity);
     }

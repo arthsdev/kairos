@@ -175,7 +175,11 @@ class MonitoredCityServiceTest {
             Plan plan = mock(Plan.class);
             City dbCity = City.builder().id("city-exists").name(cityName).build();
             GeocodingResult result = new GeocodingResult(cityName, -26.3, -48.8, "SC", "Brazil");
-            UserCity savedUserCity = UserCity.builder().id("uc-123").userId(userId).cityId("city-exists").build();
+            UserCity savedUserCity = UserCity.builder()
+                    .id("uc-123")
+                    .userId(userId)
+                    .city(City.builder().id("city-exists").build())
+                    .build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(0L);
@@ -199,7 +203,11 @@ class MonitoredCityServiceTest {
             Plan plan = mock(Plan.class);
             GeocodingResult result = new GeocodingResult(cityName, -26.3, -48.8, "SC", "Brazil");
             City newCity = City.builder().id("city-new").name(cityName).build();
-            UserCity savedUserCity = UserCity.builder().id("uc-789").userId(userId).cityId("city-new").build();
+            UserCity savedUserCity = UserCity.builder()
+                    .id("uc-789")
+                    .userId(userId)
+                    .city(City.builder().id("city-new").build())
+                    .build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(0L);
@@ -227,8 +235,16 @@ class MonitoredCityServiceTest {
         @DisplayName("Should return mapped city list and filter out inconsistent data gracefully")
         void shouldReturnMappedCitiesAndFilterInconsistencies() {
             String userId = "user-1";
-            UserCity validAssociation = UserCity.builder().id("uc-1").userId(userId).cityId("city-valid").build();
-            UserCity brokenAssociation = UserCity.builder().id("uc-2").userId(userId).cityId("city-ghost").build();
+            UserCity validAssociation = UserCity.builder()
+                    .id("uc-1")
+                    .userId(userId)
+                    .city(City.builder().id("city-valid").build())
+                    .build();
+            UserCity brokenAssociation = UserCity.builder()
+                    .id("uc-2")
+                    .userId(userId)
+                    .city(City.builder().id("city-ghost").build())
+                    .build();
 
             City validCity = City.builder().id("city-valid").name("Blumenau").build();
 
@@ -258,8 +274,16 @@ class MonitoredCityServiceTest {
         @DisplayName("Should return empty list when all associations are data inconsistencies (all filtered out)")
         void shouldReturnEmptyListWhenAllCitiesAreInconsistent() {
             String userId = "user-total-ghost";
-            UserCity brokenUc1 = UserCity.builder().id("uc-10").userId(userId).cityId("ghost-1").build();
-            UserCity brokenUc2 = UserCity.builder().id("uc-20").userId(userId).cityId("ghost-2").build();
+            UserCity brokenUc1 = UserCity.builder()
+                    .id("uc-10")
+                    .userId(userId)
+                    .city(City.builder().id("ghost-1").build())
+                    .build();
+            UserCity brokenUc2 = UserCity.builder()
+                    .id("uc-20")
+                    .userId(userId)
+                    .city(City.builder().id("ghost-2").build())
+                    .build();
 
             when(userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId))
                     .thenReturn(List.of(brokenUc1, brokenUc2));
@@ -278,8 +302,14 @@ class MonitoredCityServiceTest {
         @Test
         @DisplayName("Should return list of active CityLocations and skip inconsistent items")
         void shouldReturnActiveCitiesAndFilterGhostEntries() {
-            UserCity activeUc = UserCity.builder().id("uc-1").cityId("city-active").build();
-            UserCity ghostUc = UserCity.builder().id("uc-2").cityId("city-ghost").build();
+            UserCity activeUc = UserCity.builder()
+                    .id("uc-1")
+                    .city(City.builder().id("city-active").build())
+                    .build();
+            UserCity ghostUc = UserCity.builder()
+                    .id("uc-2")
+                    .city(City.builder().id("city-ghost").build())
+                    .build();
             City city = City.builder().id("city-active").name("Timbó").latitude(-26.8).longitude(-49.2).build();
 
             when(userCityRepository.findAllByActiveTrue()).thenReturn(List.of(activeUc, ghostUc));
@@ -305,8 +335,14 @@ class MonitoredCityServiceTest {
         @Test
         @DisplayName("Should return empty list when all active monitorings point to non-existent cities")
         void shouldReturnEmptyListWhenAllActiveCitiesAreInconsistent() {
-            UserCity brokenUc1 = UserCity.builder().id("uc-30").cityId("ghost-3").build();
-            UserCity brokenUc2 = UserCity.builder().id("uc-40").cityId("ghost-4").build();
+            UserCity brokenUc1 = UserCity.builder()
+                    .id("uc-30")
+                    .city(City.builder().id("ghost-3").build())
+                    .build();
+            UserCity brokenUc2 = UserCity.builder()
+                    .id("uc-40")
+                    .city(City.builder().id("ghost-4").build())
+                    .build();
 
             when(userCityRepository.findAllByActiveTrue()).thenReturn(List.of(brokenUc1, brokenUc2));
             when(cityRepository.findAllById(anyList())).thenReturn(Collections.emptyList());
