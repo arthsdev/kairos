@@ -23,8 +23,9 @@ public class UserCity {
     @Column(name = "user_id", nullable = false)
     private String userId;
 
-    @Column(name = "city_id", nullable = false)
-    private String cityId;
+    @JoinColumn(name = "city_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    private City city;
 
     @Column(nullable = false)
     private boolean active;
