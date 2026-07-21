@@ -9,7 +9,6 @@ import java.util.Collection;
 import java.util.Collections;
 import java.util.List;
 import java.util.Map;
-import java.util.stream.Collectors;
 
 public class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedAuthority>> {
 
@@ -17,16 +16,16 @@ public class KeycloakRoleConverter implements Converter<Jwt, Collection<GrantedA
     public Collection<GrantedAuthority> convert(Jwt jwt) {
         Map<String, Object> realmAccess = jwt.getClaim("realm_access");
 
-        if (realmAccess == null || !realmAccess.containsKey("roles")) {
+        if (realmAccess == null || !(realmAccess.get("roles") instanceof List<?> rawRoles)) {
             return Collections.emptyList();
         }
 
-        List<String> roles = (List<String>) realmAccess.get("roles");
-
-        return roles.stream()
-                .map(role -> new SimpleGrantedAuthority(
+        return rawRoles.stream()
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .<GrantedAuthority>map(role -> new SimpleGrantedAuthority(
                         role.startsWith("ROLE_") ? role : "ROLE_" + role
                 ))
-                .collect(Collectors.toList());
+                .toList();
     }
 }
