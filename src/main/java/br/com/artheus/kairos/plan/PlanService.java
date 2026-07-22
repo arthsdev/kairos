@@ -1,12 +1,13 @@
 package br.com.artheus.kairos.plan;
 
+import br.com.artheus.kairos.shared.contract.payment.PaymentCheckoutProvider;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -18,6 +19,7 @@ public class PlanService {
 
 
     private final PlanRepository planRepository;
+    private final PaymentCheckoutProvider paymentCheckoutProvider;
 
     public PlanResponse createPlan(String userId) {
 
@@ -29,15 +31,20 @@ public class PlanService {
         return PlanResponse.from(plan);
     }
 
+    public CheckoutSessionResponse startPremiumCheckout(String userId) {
+        Plan plan = findPlanOrThrow(userId);
+
+        ensureNotAlreadyPremium(plan);
+
+        String checkoutUrl = paymentCheckoutProvider.createCheckoutSession(userId);
+
+        return new CheckoutSessionResponse(checkoutUrl);
+    }
 
     public PlanResponse upgradeToPremium(String userId) {
+        Plan plan = findPlanOrThrow(userId);
 
-        Plan plan = planRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
-
-        if (plan.getPlanType().equals(PlanType.PREMIUM)) {
-            throw new BusinessException("Plan is already Premium");
-        }
+        ensureNotAlreadyPremium(plan);
 
         plan.upgradeToPremium();
 
@@ -47,9 +54,7 @@ public class PlanService {
     }
 
     public PlanStatusResponse getMyPlan(String userId) {
-
-        Plan plan = planRepository.findByUserId(userId)
-                .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
+        Plan plan = findPlanOrThrow(userId);
 
         return PlanStatusResponse.from(plan);
     }
@@ -66,7 +71,7 @@ public class PlanService {
     }
 
     /*If plan doesn't exist this method will add a trial plan on the first request
-    * via PlanFirstAccessFilter */
+     * via PlanFirstAccessFilter */
     @Transactional
     public void ensurePlanExists(String userId) {
         if (!planRepository.existsByUserId(userId)) {
@@ -81,5 +86,16 @@ public class PlanService {
                 log.info("Plan creation race condition detected for user: {}. Plan already persisted concurrently.", userId);
             }
         }
+    }
+
+    private void ensureNotAlreadyPremium(Plan plan) {
+        if (plan.getPlanType().equals(PlanType.PREMIUM)) {
+            throw new BusinessException("Plan is already Premium");
+        }
+    }
+
+    private Plan findPlanOrThrow(String userId) {
+        return planRepository.findByUserId(userId)
+                .orElseThrow(() -> new ResourceNotFoundException("Plan not found"));
     }
 }
