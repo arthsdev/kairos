@@ -31,6 +31,9 @@ spring:
 
 stripe:
   secret-key: sk_test_dummy_for_tests
+  success-url: http://localhost/mock-success
+  cancel-url: http://localhost/mock-cancel
+  premium-price-id: price_mock_dummy
 
 KEYCLOAK_URL: http://localhost:8080
 KEYCLOAK_REALM: mock-realm
