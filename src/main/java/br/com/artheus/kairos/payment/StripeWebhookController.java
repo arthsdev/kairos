@@ -1,6 +1,7 @@
 package br.com.artheus.kairos.payment;
 
 import br.com.artheus.kairos.shared.contract.payment.PaymentWebhookProcessor;
+import com.stripe.exception.EventDataObjectDeserializationException;
 import com.stripe.exception.SignatureVerificationException;
 import com.stripe.model.Event;
 import com.stripe.model.EventDataObjectDeserializer;
@@ -39,7 +40,7 @@ public class StripeWebhookController {
         try {
             event = Webhook.constructEvent(payload, sigHeader, webhookSecret);
         } catch (SignatureVerificationException e) {
-            log.error("Invalid Stripe signature", e);
+            log.error("Invalid Stripe signature header", e);
             return ResponseEntity.status(HttpStatus.BAD_REQUEST).build();
         } catch (Exception e) {
             log.error("Error parsing Stripe webhook payload", e);
@@ -52,7 +53,7 @@ public class StripeWebhookController {
                 break;
 
             default:
-                log.debug("Unhandled event type: {}", event.getType());
+                log.debug("Unhandled Stripe event type: {}", event.getType());
                 break;
         }
 
@@ -61,19 +62,46 @@ public class StripeWebhookController {
 
     private void processCheckoutCompleted(Event event) {
         EventDataObjectDeserializer dataObjectDeserializer = event.getDataObjectDeserializer();
+        Session session = null;
 
         if (dataObjectDeserializer.getObject().isPresent()) {
             StripeObject stripeObject = dataObjectDeserializer.getObject().get();
-
-            if (stripeObject instanceof Session session) {
-                String userId = session.getClientReferenceId();
-                String customerId = session.getCustomer();
-                String subscriptionId = session.getSubscription();
-
-                paymentWebhookProcessor.handleCheckoutCompleted(userId, customerId, subscriptionId);
+            if (stripeObject instanceof Session s) {
+                session = s;
             }
         } else {
-            log.warn("Deserialization failed for event ID: {}", event.getId());
+            log.warn("Safe deserialization failed for event ID: {}. Attempting unsafe fallback...", event.getId());
+            try {
+                StripeObject stripeObject = dataObjectDeserializer.deserializeUnsafe();
+                if (stripeObject instanceof Session s) {
+                    session = s;
+                }
+            } catch (EventDataObjectDeserializationException e) {
+                log.error("Stripe SDK deserialization error during unsafe fallback for event ID: {}", event.getId(), e);
+                throw new IllegalStateException("Failed to deserialize Stripe checkout session", e);
+            } catch (Exception e) {
+                log.error("Unexpected error during unsafe deserialization for Stripe event ID: {}", event.getId(), e);
+                throw new IllegalStateException("Failed to deserialize Stripe checkout session", e);
+            }
         }
+
+        if (session == null) {
+            log.error("Checkout session payload is invalid or null for event ID: {}", event.getId());
+            return;
+        }
+
+        String userId = session.getClientReferenceId();
+        String customerId = session.getCustomer();
+        String subscriptionId = session.getSubscription();
+
+        if (userId == null || userId.isBlank()) {
+            log.error("Missing clientReferenceId (userId) in checkout session for event ID: {}", event.getId());
+            return;
+        }
+
+        log.info("Processing checkout.session.completed for userId: {}, customerId: {}, subscriptionId: {}",
+                userId, customerId, subscriptionId);
+
+        paymentWebhookProcessor.handleCheckoutCompleted(userId, customerId, subscriptionId);
     }
 }
