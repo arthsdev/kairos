@@ -1,5 +1,6 @@
 package br.com.artheus.kairos.plan;
 
+import br.com.artheus.kairos.shared.exception.BusinessException;
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
 import lombok.Builder;
@@ -30,6 +31,12 @@ public class Plan {
     @Column(nullable = false)
     private int cityLimit;
 
+    @Column(name = "stripe_customer_id")
+    private String stripeCustomerId;
+
+    @Column(name = "stripe_subscription_id")
+    private String stripeSubscriptionId;
+
     @Column(nullable = false)
     private LocalDateTime createdAt;
 
@@ -42,16 +49,22 @@ public class Plan {
         return expiresAt != null && LocalDateTime.now().isAfter(expiresAt);
     }
 
-    public void upgradeToPremium() {
+    public void upgradeToPremium(String stripeCustomerId, String stripeSubscriptionId) {
+        if (this.planType == PlanType.PREMIUM) {
+            throw new BusinessException("Plan is already Premium");
+        }
         this.planType = PlanType.PREMIUM;
-        this.expiresAt = LocalDateTime.now().plusDays(30);
+        this.expiresAt = null;
+        this.cityLimit = 5;
+        this.stripeCustomerId = stripeCustomerId;
+        this.stripeSubscriptionId = stripeSubscriptionId;
         this.updatedAt = LocalDateTime.now();
-        cityLimit = 5;
     }
 
     public void downgradeToFree() {
         this.planType = PlanType.FREE;
         this.cityLimit = 1;
+        this.expiresAt = null;
         this.updatedAt = LocalDateTime.now();
     }
 

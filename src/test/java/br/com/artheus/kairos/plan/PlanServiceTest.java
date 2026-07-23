@@ -1,8 +1,8 @@
 package br.com.artheus.kairos.plan;
 
+import br.com.artheus.kairos.shared.contract.payment.PaymentCheckoutProvider;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
-import org.springframework.dao.DataIntegrityViolationException;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -11,6 +11,7 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.InjectMocks;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
+import org.springframework.dao.DataIntegrityViolationException;
 
 import java.time.LocalDateTime;
 import java.util.Collections;
@@ -26,8 +27,14 @@ import static org.mockito.Mockito.*;
 @DisplayName("PlanService Unit Tests")
 class PlanServiceTest {
 
+    private static final String DEFAULT_CUSTOMER_ID = "cus_test_123";
+    private static final String DEFAULT_SUBSCRIPTION_ID = "sub_test_456";
+
     @Mock
     private PlanRepository planRepository;
+
+    @Mock
+    private PaymentCheckoutProvider paymentCheckoutProvider;
 
     @InjectMocks
     private PlanService planService;
@@ -53,37 +60,91 @@ class PlanServiceTest {
     }
 
     @Nested
+    @DisplayName("Tests for startPremiumCheckout")
+    class StartPremiumCheckoutTests {
+
+        @Test
+        @DisplayName("Should create checkout session URL successfully when plan exists and is not PREMIUM")
+        void shouldStartPremiumCheckoutSuccessfully() {
+            String userId = "user-123";
+            String expectedCheckoutUrl = "https://checkout.stripe.com/pay/cs_test_123";
+            Plan plan = Plan.builder().userId(userId).planType(PlanType.FREE).build();
+
+            when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
+            when(paymentCheckoutProvider.createCheckoutSession(userId)).thenReturn(expectedCheckoutUrl);
+
+            CheckoutSessionResponse response = planService.startPremiumCheckout(userId);
+
+            assertThat(response).isNotNull();
+            assertThat(response.checkoutUrl()).isEqualTo(expectedCheckoutUrl);
+            verify(paymentCheckoutProvider, times(1)).createCheckoutSession(userId);
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when plan is already PREMIUM during checkout start")
+        void shouldThrowExceptionWhenStartingCheckoutForAlreadyPremiumPlan() {
+            String userId = "user-premium";
+            Plan plan = Plan.builder().userId(userId).planType(PlanType.PREMIUM).build();
+
+            when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
+
+            assertThatThrownBy(() -> planService.startPremiumCheckout(userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessageContaining("Plan is already Premium");
+
+            verify(paymentCheckoutProvider, never()).createCheckoutSession(any());
+        }
+
+        @Test
+        @DisplayName("Should throw ResourceNotFoundException when user has no plan during checkout start")
+        void shouldThrowExceptionWhenPlanNotFoundOnCheckoutStart() {
+            String userId = "user-ghost";
+            when(planRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> planService.startPremiumCheckout(userId))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Plan not found");
+
+            verify(paymentCheckoutProvider, never()).createCheckoutSession(any());
+        }
+    }
+
+    @Nested
     @DisplayName("Tests for upgradeToPremium")
     class UpgradeToPremiumTests {
 
         @Test
-        @DisplayName("Should successfully upgrade to PREMIUM when current plan is FREE")
+        @DisplayName("Should successfully upgrade to PREMIUM and persist Stripe IDs when current plan is FREE")
         void shouldUpgradeToPremiumWhenPlanIsFree() {
             String userId = "user-free";
             Plan currentPlan = Plan.builder().userId(userId).planType(PlanType.FREE).cityLimit(1).build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(currentPlan));
 
-            PlanResponse response = planService.upgradeToPremium(userId);
+            PlanResponse response = planService.upgradeToPremium(userId, DEFAULT_CUSTOMER_ID, DEFAULT_SUBSCRIPTION_ID);
 
             verify(planRepository, times(1)).save(currentPlan);
             assertThat(currentPlan.getPlanType()).isEqualTo(PlanType.PREMIUM);
             assertThat(currentPlan.getCityLimit()).isEqualTo(5);
+            assertThat(currentPlan.getStripeCustomerId()).isEqualTo(DEFAULT_CUSTOMER_ID);
+            assertThat(currentPlan.getStripeSubscriptionId()).isEqualTo(DEFAULT_SUBSCRIPTION_ID);
             assertThat(response).isNotNull();
         }
 
         @Test
-        @DisplayName("Should successfully upgrade to PREMIUM when current plan is TRIAL")
+        @DisplayName("Should successfully upgrade to PREMIUM and persist Stripe IDs when current plan is TRIAL")
         void shouldUpgradeToPremiumWhenPlanIsTrial() {
             String userId = "user-trial";
             Plan currentPlan = Plan.builder().userId(userId).planType(PlanType.TRIAL).cityLimit(5).build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(currentPlan));
 
-            PlanResponse response = planService.upgradeToPremium(userId);
+            PlanResponse response = planService.upgradeToPremium(userId, DEFAULT_CUSTOMER_ID, DEFAULT_SUBSCRIPTION_ID);
 
             verify(planRepository, times(1)).save(currentPlan);
             assertThat(currentPlan.getPlanType()).isEqualTo(PlanType.PREMIUM);
+            assertThat(currentPlan.getStripeCustomerId()).isEqualTo(DEFAULT_CUSTOMER_ID);
+            assertThat(currentPlan.getStripeSubscriptionId()).isEqualTo(DEFAULT_SUBSCRIPTION_ID);
             assertThat(response).isNotNull();
         }
 
@@ -95,7 +156,7 @@ class PlanServiceTest {
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(currentPlan));
 
-            assertThatThrownBy(() -> planService.upgradeToPremium(userId))
+            assertThatThrownBy(() -> planService.upgradeToPremium(userId, DEFAULT_CUSTOMER_ID, DEFAULT_SUBSCRIPTION_ID))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("Plan is already Premium");
 
@@ -108,7 +169,51 @@ class PlanServiceTest {
             String userId = "user-ghost";
             when(planRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> planService.upgradeToPremium(userId))
+            assertThatThrownBy(() -> planService.upgradeToPremium(userId, DEFAULT_CUSTOMER_ID, DEFAULT_SUBSCRIPTION_ID))
+                    .isInstanceOf(ResourceNotFoundException.class)
+                    .hasMessageContaining("Plan not found");
+
+            verify(planRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Tests for handleCheckoutCompleted")
+    class HandleCheckoutCompletedTests {
+
+        @Test
+        @DisplayName("Should successfully upgrade user plan to PREMIUM and persist customer and subscription IDs on checkout completed")
+        void shouldUpgradeUserToPremiumOnCheckoutCompleted() {
+            String userId = "user-123";
+            String customerId = "cus_webhook_123";
+            String subscriptionId = "sub_webhook_456";
+
+            Plan plan = Plan.builder()
+                    .userId(userId)
+                    .planType(PlanType.FREE)
+                    .cityLimit(1)
+                    .build();
+
+            when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
+
+            planService.handleCheckoutCompleted(userId, customerId, subscriptionId);
+
+            verify(planRepository, times(1)).save(plan);
+            assertThat(plan.getPlanType()).isEqualTo(PlanType.PREMIUM);
+            assertThat(plan.getStripeCustomerId()).isEqualTo(customerId);
+            assertThat(plan.getStripeSubscriptionId()).isEqualTo(subscriptionId);
+        }
+
+        @Test
+        @DisplayName("Should rethrow exception when upgrade fails to trigger webhook retry")
+        void shouldRethrowExceptionWhenUpgradeFails() {
+            String userId = "user-ghost";
+            String customerId = "cus_webhook_123";
+            String subscriptionId = "sub_webhook_456";
+
+            when(planRepository.findByUserId(userId)).thenReturn(Optional.empty());
+
+            assertThatThrownBy(() -> planService.handleCheckoutCompleted(userId, customerId, subscriptionId))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining("Plan not found");
 
@@ -152,7 +257,7 @@ class PlanServiceTest {
         @Test
         @DisplayName("Should do nothing when no expired plans are returned by the repository")
         void shouldDoNothingWhenNoPlansAreExpired() {
-            when(planRepository.findByExpiresAtBeforeAndPlanTypeNot(any(LocalDateTime.class), eq(PlanType.FREE)))
+            when(planRepository.findByExpiresAtBeforeAndPlanType(any(LocalDateTime.class), eq(PlanType.TRIAL)))
                     .thenReturn(Collections.emptyList());
 
             planService.checkExpiredPlans();
@@ -161,13 +266,13 @@ class PlanServiceTest {
         }
 
         @Test
-        @DisplayName("Should iterate, downgrade each expired plan to FREE, and persist updates")
-        void shouldDowngradeAllExpiredPlansFound() {
-            Plan planOne = spy(Plan.builder().planType(PlanType.PREMIUM).cityLimit(5).build());
+        @DisplayName("Should iterate, downgrade each expired TRIAL plan to FREE, and persist updates")
+        void shouldDowngradeAllExpiredTrialPlansFound() {
+            Plan planOne = spy(Plan.builder().planType(PlanType.TRIAL).cityLimit(5).build());
             Plan planTwo = spy(Plan.builder().planType(PlanType.TRIAL).cityLimit(5).build());
             List<Plan> expiredPlans = List.of(planOne, planTwo);
 
-            when(planRepository.findByExpiresAtBeforeAndPlanTypeNot(any(LocalDateTime.class), eq(PlanType.FREE)))
+            when(planRepository.findByExpiresAtBeforeAndPlanType(any(LocalDateTime.class), eq(PlanType.TRIAL)))
                     .thenReturn(expiredPlans);
 
             planService.checkExpiredPlans();

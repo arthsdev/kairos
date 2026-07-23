@@ -46,6 +46,13 @@ discord:
   webhook:
     url: ${DISCORD_WEBHOOK_URL}
 
+stripe:
+  secret-key: ${STRIPE_SECRET_KEY}
+  webhook-secret: ${STRIPE_WEBHOOK_SECRET}
+  premium-price-id: ${STRIPE_PREMIUM_PRICE_ID}
+  success-url: ${STRIPE_SUCCESS_URL:http://localhost:8081/plans/success}
+  cancel-url: ${STRIPE_CANCEL_URL:http://localhost:8081/plans/cancel}
+
 kairos:
   risk-calculator:
     climate-weight: 0.7

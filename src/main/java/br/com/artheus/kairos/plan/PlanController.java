@@ -24,24 +24,20 @@ public class PlanController {
 
 
     @PostMapping("/upgrade")
-    // TODO: This endpoint currently upgrades the plan without payment validation.
-    // Before going to production, integrate a payment gateway (e.g., Stripe, PagSeguro)
-    // and protect this endpoint with payment confirmation before updating the plan.
     @Operation(
-            summary = "Upgrade account to Premium",
-            description = "Changes the subscription tier of the authenticated user to the Premium plan. " +
-                    "NOTE: Payment integration is not yet implemented. This endpoint is a placeholder."
+            summary = "Start Premium subscription checkout",
+            description = "Creates a Stripe Checkout Session for the authenticated user to subscribe to the Premium plan. " +
+                    "The plan is only upgraded after payment is confirmed via Stripe webhook."
     )
     @ApiResponses(value = {
-            @ApiResponse(responseCode = "200", description = "Subscription upgraded successfully"),
+            @ApiResponse(responseCode = "200", description = "Checkout session created successfully, returns the payment URL"),
             @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token"),
-            @ApiResponse(responseCode = "402", description = "Payment required or transaction failed"),
             @ApiResponse(responseCode = "422", description = "Business rule violation (e.g., user is already premium)")
     })
-    public ResponseEntity<PlanResponse> upgradeToPremium(
+    public ResponseEntity<CheckoutSessionResponse> startPremiumCheckout(
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
         String userId = jwt.getSubject();
-        return ResponseEntity.ok(planService.upgradeToPremium(userId));
+        return ResponseEntity.ok(planService.startPremiumCheckout(userId));
     }
 
     @GetMapping

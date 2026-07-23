@@ -51,19 +51,24 @@ class PlanTest {
     class PlanStateTransitionsTests {
 
         @Test
-        @DisplayName("Should correctly upgrade to premium state and extend expiration by 30 days")
+        @DisplayName("Should correctly upgrade to premium state and clear expiration date")
         void shouldUpgradeToPremiumSuccessfully() {
+            String customerId = "cus_123";
+            String subscriptionId = "sub_456";
+
             Plan plan = Plan.builder()
                     .planType(PlanType.FREE)
                     .cityLimit(1)
                     .build();
 
-            plan.upgradeToPremium();
+            plan.upgradeToPremium(customerId, subscriptionId);
 
             assertThat(plan.getPlanType()).isEqualTo(PlanType.PREMIUM);
             assertThat(plan.getCityLimit()).isEqualTo(5);
-            assertThat(plan.getUpdatedAt()).isBeforeOrEqualTo(LocalDateTime.now());
-            assertThat(plan.getExpiresAt()).isAfter(LocalDateTime.now().plusDays(29));
+            assertThat(plan.getStripeCustomerId()).isEqualTo(customerId);
+            assertThat(plan.getStripeSubscriptionId()).isEqualTo(subscriptionId);
+            assertThat(plan.getExpiresAt()).isNull();
+            assertThat(plan.getUpdatedAt()).isNotNull();
         }
 
         @Test
