@@ -16,5 +16,7 @@ public interface PlanRepository extends JpaRepository<Plan, String> {
 
     List<Plan> findByExpiresAtBeforeAndPlanType(LocalDateTime dateTime, PlanType planType);
 
+    Optional<Plan> findByStripeCustomerId(String stripeCustomerId);
+
     boolean existsByUserId(String userId);
 }
