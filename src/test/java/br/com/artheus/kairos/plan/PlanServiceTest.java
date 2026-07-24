@@ -222,6 +222,100 @@ class PlanServiceTest {
     }
 
     @Nested
+    @DisplayName("Tests for handleInvoicePaid")
+    class HandleInvoicePaidTests {
+
+        @Test
+        @DisplayName("Should log renewal confirmation without changes when plan is already PREMIUM")
+        void shouldConfirmRenewalWhenAlreadyPremium() {
+            String customerId = "cus_123";
+            String subscriptionId = "sub_456";
+            Plan plan = Plan.builder().planType(PlanType.PREMIUM).build();
+
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.of(plan));
+
+            planService.handleInvoicePaid(customerId, subscriptionId);
+
+            verify(planRepository, never()).save(any());
+        }
+
+        @Test
+        @DisplayName("Should reactivate plan to PREMIUM when plan exists but is not PREMIUM")
+        void shouldReactivatePlanWhenNotPremium() {
+            String customerId = "cus_123";
+            String subscriptionId = "sub_456";
+            Plan plan = Plan.builder().planType(PlanType.FREE).cityLimit(1).build();
+
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.of(plan));
+
+            planService.handleInvoicePaid(customerId, subscriptionId);
+
+            verify(planRepository, times(1)).save(plan);
+            assertThat(plan.getPlanType()).isEqualTo(PlanType.PREMIUM);
+        }
+
+        @Test
+        @DisplayName("Should do nothing when no plan is found for the customerId")
+        void shouldDoNothingWhenPlanNotFound() {
+            String customerId = "cus_ghost";
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.empty());
+
+            planService.handleInvoicePaid(customerId, "sub_456");
+
+            verify(planRepository, never()).save(any());
+        }
+    }
+
+    @Nested
+    @DisplayName("Tests for handlePaymentFailed")
+    class HandlePaymentFailedTests {
+
+        @Test
+        @DisplayName("Should take no action on plan status when payment fails")
+        void shouldTakeNoActionOnPaymentFailed() {
+            planService.handlePaymentFailed("cus_123", "sub_456");
+
+            verifyNoInteractions(planRepository);
+        }
+    }
+
+    @Nested
+    @DisplayName("Tests for handleSubscriptionDeleted")
+    class HandleSubscriptionDeletedTests {
+
+        @Test
+        @DisplayName("Should downgrade plan to FREE when subscription is deleted")
+        void shouldDowngradeToFreeWhenSubscriptionIsDeleted() {
+            String customerId = "cus_123";
+            String subscriptionId = "sub_456";
+            Plan plan = Plan.builder()
+                    .userId("user-123")
+                    .planType(PlanType.PREMIUM)
+                    .stripeCustomerId(customerId)
+                    .stripeSubscriptionId(subscriptionId)
+                    .build();
+
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.of(plan));
+
+            planService.handleSubscriptionDeleted(customerId, subscriptionId);
+
+            assertThat(plan.getPlanType()).isEqualTo(PlanType.FREE);
+            verify(planRepository, times(1)).save(plan);
+        }
+
+        @Test
+        @DisplayName("Should log warning and skip gracefully when no plan is found for subscription deletion")
+        void shouldLogWarningWhenNoPlanFoundForSubscriptionDeleted() {
+            String customerId = "cus_ghost";
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.empty());
+
+            planService.handleSubscriptionDeleted(customerId, "sub_456");
+
+            verify(planRepository, never()).save(any());
+        }
+    }
+
+    @Nested
     @DisplayName("Tests for getMyPlan")
     class GetMyPlanTests {
 

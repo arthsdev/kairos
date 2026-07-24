@@ -65,6 +65,7 @@ public class Plan {
         this.planType = PlanType.FREE;
         this.cityLimit = 1;
         this.expiresAt = null;
+        this.stripeSubscriptionId = null;
         this.updatedAt = LocalDateTime.now();
     }
 

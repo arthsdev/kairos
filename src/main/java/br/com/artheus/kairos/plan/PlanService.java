@@ -102,6 +102,46 @@ public class PlanService implements PaymentWebhookProcessor {
         }
     }
 
+    @Override
+    @Transactional
+    public void handleInvoicePaid(String customerId, String subscriptionId) {
+        log.info("Processing webhook invoice.paid for customerId: {}, subscriptionId: {}", customerId, subscriptionId);
+
+        planRepository.findByStripeCustomerId(customerId).ifPresentOrElse(
+                plan -> {
+                    if (!PlanType.PREMIUM.equals(plan.getPlanType())) {
+                        plan.upgradeToPremium(customerId, subscriptionId);
+                        planRepository.save(plan);
+                        log.info("Plan reactivated to PREMIUM via invoice.paid for customerId: {}", customerId);
+                    } else {
+                        log.info("Renewal confirmed for customerId: {}. Plan is already PREMIUM.", customerId);
+                    }
+                },
+                () -> log.warn("Invoice paid received, but no plan was found for customerId: {}. Skipping.", customerId)
+        );
+    }
+
+    @Override
+    public void handlePaymentFailed(String customerId, String subscriptionId) {
+        log.warn("Payment failed webhook received for customerId: {}, subscriptionId: {}. No action taken on plan status.",
+                customerId, subscriptionId);
+    }
+
+    @Override
+    @Transactional
+    public void handleSubscriptionDeleted(String customerId, String subscriptionId) {
+        log.info("Processing webhook customer.subscription.deleted for customerId: {}, subscriptionId: {}", customerId, subscriptionId);
+
+        planRepository.findByStripeCustomerId(customerId).ifPresentOrElse(
+                plan -> {
+                    plan.downgradeToFree();
+                    planRepository.save(plan);
+                    log.info("Successfully downgraded plan to FREE for customerId: {}", customerId);
+                },
+                () -> log.warn("Subscription deleted event received, but no plan was found for customerId: {}. Skipping downgrade.", customerId)
+        );
+    }
+
     private void ensureNotAlreadyPremium(Plan plan) {
         if (plan.getPlanType().equals(PlanType.PREMIUM)) {
             throw new BusinessException("Plan is already Premium");
