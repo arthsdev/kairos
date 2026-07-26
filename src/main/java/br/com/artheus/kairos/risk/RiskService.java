@@ -44,7 +44,8 @@ public class RiskService {
 
         if (calculatedRisk == RiskLevel.CRITICAL || calculatedRisk == RiskLevel.HIGH) {
             CityLocation cityLocation = cityProvider.findCityById(riskMessage.cityId());
-            notificationSender.sendNotification(cityLocation.name(), calculatedRisk);
+            String message = String.format("Alert: City %s reached a risk level of %s!", cityLocation.name(), calculatedRisk);
+            notificationSender.sendNotification(message);
         }
 
         log.info("Risk calculated for city: {}", riskMessage.cityId());

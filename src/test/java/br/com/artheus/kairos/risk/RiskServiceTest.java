@@ -72,11 +72,13 @@ class RiskServiceTest {
             riskService.processRiskCalculation(mockMessage);
 
             // Then
+            String expectedMessage = String.format("Alert: City %s reached a risk level of %s!", cityName, RiskLevel.HIGH);
+
             InOrder inOrder = inOrder(riskProvider, cityProvider, notificationSender);
 
             inOrder.verify(riskProvider).saveCalculatedRisk(cityId, RiskLevel.HIGH);
             inOrder.verify(cityProvider).findCityById(cityId);
-            inOrder.verify(notificationSender).sendNotification(cityName, RiskLevel.HIGH);
+            inOrder.verify(notificationSender).sendNotification(expectedMessage);
         }
 
         @Test
@@ -91,11 +93,13 @@ class RiskServiceTest {
             riskService.processRiskCalculation(mockMessage);
 
             // Then
+            String expectedMessage = String.format("Alert: City %s reached a risk level of %s!", cityName, RiskLevel.CRITICAL);
+
             InOrder inOrder = inOrder(riskProvider, cityProvider, notificationSender);
 
             inOrder.verify(riskProvider).saveCalculatedRisk(cityId, RiskLevel.CRITICAL);
             inOrder.verify(cityProvider).findCityById(cityId);
-            inOrder.verify(notificationSender).sendNotification(cityName, RiskLevel.CRITICAL);
+            inOrder.verify(notificationSender).sendNotification(expectedMessage);
         }
 
         @Test
@@ -112,7 +116,7 @@ class RiskServiceTest {
             verify(riskProvider).saveCalculatedRisk(cityId, RiskLevel.MEDIUM);
 
             verify(cityProvider, never()).findCityById(any());
-            verify(notificationSender, never()).sendNotification(any(), any());
+            verify(notificationSender, never()).sendNotification(any());
         }
 
         @Test
@@ -129,7 +133,7 @@ class RiskServiceTest {
             verify(riskProvider).saveCalculatedRisk(cityId, RiskLevel.LOW);
 
             verify(cityProvider, never()).findCityById(any());
-            verify(notificationSender, never()).sendNotification(any(), any());
+            verify(notificationSender, never()).sendNotification(any());
         }
     }
 }

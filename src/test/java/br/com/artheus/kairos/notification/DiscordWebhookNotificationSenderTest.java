@@ -41,23 +41,20 @@ class DiscordWebhookNotificationSenderTest {
     @DisplayName("Tests for sendNotification")
     class SendNotificationTests {
 
-        private final String cityName = "Joinville";
-        private final RiskLevel riskLevel = RiskLevel.HIGH;
-        private final String expectedMessage = "Alert: City Joinville reached a risk level of HIGH!";
-        private final Map<String, String> expectedPayload = Map.of("content", expectedMessage);
+        private final String message = "Alert: City Joinville reached a risk level of HIGH!";
 
         @Test
         @DisplayName("Should send Discord notification successfully when WebClient call completes")
         void shouldSendNotificationSuccessfully() {
             when(webClient.post()
                     .uri(mockWebhookUrl)
-                    .bodyValue(expectedPayload)
+                    .bodyValue(Map.of("content", message))
                     .retrieve()
                     .bodyToMono(Void.class)
                     .block())
                     .thenReturn(null);
 
-            assertThatCode(() -> notificationSender.sendNotification(cityName, riskLevel))
+            assertThatCode(() -> notificationSender.sendNotification(message))
                     .doesNotThrowAnyException();
         }
 
@@ -76,7 +73,7 @@ class DiscordWebhookNotificationSenderTest {
                     .block())
                     .thenThrow(discordError);
 
-            assertThatCode(() -> notificationSender.sendNotification(cityName, riskLevel))
+            assertThatCode(() -> notificationSender.sendNotification(message))
                     .doesNotThrowAnyException();
         }
     }

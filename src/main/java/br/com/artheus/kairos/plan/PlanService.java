@@ -21,6 +21,7 @@ public class PlanService implements PaymentWebhookProcessor {
 
     private final PlanRepository planRepository;
     private final PaymentCheckoutProvider paymentCheckoutProvider;
+    private final BillingNotificationService billingNotificationService;
 
     public PlanResponse createPlan(String userId) {
 
@@ -125,6 +126,11 @@ public class PlanService implements PaymentWebhookProcessor {
     public void handlePaymentFailed(String customerId, String subscriptionId) {
         log.warn("Payment failed webhook received for customerId: {}, subscriptionId: {}. No action taken on plan status.",
                 customerId, subscriptionId);
+
+        planRepository.findByStripeCustomerId(customerId).ifPresentOrElse(
+                plan -> billingNotificationService.notifyPaymentFailed(customerId),
+                () -> log.warn("Payment failed event received, but no plan was found for customerId: {}. Skipping notification.", customerId)
+        );
     }
 
     @Override
@@ -136,6 +142,7 @@ public class PlanService implements PaymentWebhookProcessor {
                 plan -> {
                     plan.downgradeToFree();
                     planRepository.save(plan);
+                    billingNotificationService.notifyCancellation(customerId);
                     log.info("Successfully downgraded plan to FREE for customerId: {}", customerId);
                 },
                 () -> log.warn("Subscription deleted event received, but no plan was found for customerId: {}. Skipping downgrade.", customerId)

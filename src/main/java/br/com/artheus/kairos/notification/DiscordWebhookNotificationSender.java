@@ -1,7 +1,6 @@
 package br.com.artheus.kairos.notification;
 
 import br.com.artheus.kairos.shared.contract.notification.NotificationSender;
-import br.com.artheus.kairos.shared.enums.RiskLevel;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +20,9 @@ public class DiscordWebhookNotificationSender implements NotificationSender {
     private String webhookUrl;
 
     @Override
-    public void sendNotification(String cityName, RiskLevel riskLevel) {
+    public void sendNotification(String message) {
         try {
-            String message = String.format("Alert: City %s reached a risk level of %s!", cityName, riskLevel.toString());
             Map<String, String> payload = Map.of("content", message);
-
-            log.info("Sending Discord notification for {}...", cityName);
 
             webClient.post()
                     .uri(webhookUrl)
@@ -35,10 +31,10 @@ public class DiscordWebhookNotificationSender implements NotificationSender {
                     .bodyToMono(Void.class)
                     .block();
 
-            log.info("Notification sent successfully to {}", cityName);
+            log.info("Notification sent successfully. Message: {}.", message);
 
         } catch (Exception e) {
-            log.error("Failed to send Discord notification for {}. Continuing process. Error: {}", cityName, e.getMessage());
+            log.error("Failed to send Discord notification. Message: {}. Error: {}", message, e.getMessage(), e);
         }
     }
 }
