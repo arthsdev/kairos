@@ -36,6 +36,9 @@ class PlanServiceTest {
     @Mock
     private PaymentCheckoutProvider paymentCheckoutProvider;
 
+    @Mock
+    private BillingNotificationService billingNotificationService;
+
     @InjectMocks
     private PlanService planService;
 
@@ -271,11 +274,27 @@ class PlanServiceTest {
     class HandlePaymentFailedTests {
 
         @Test
-        @DisplayName("Should take no action on plan status when payment fails")
-        void shouldTakeNoActionOnPaymentFailed() {
-            planService.handlePaymentFailed("cus_123", "sub_456");
+        @DisplayName("Should notify billing failure when plan is found")
+        void shouldNotifyWhenPlanFound() {
+            String customerId = "cus_123";
+            Plan plan = Plan.builder().planType(PlanType.PREMIUM).build();
 
-            verifyNoInteractions(planRepository);
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.of(plan));
+
+            planService.handlePaymentFailed(customerId, "sub_456");
+
+            verify(billingNotificationService, times(1)).notifyPaymentFailed(customerId);
+        }
+
+        @Test
+        @DisplayName("Should not notify when no plan is found for the customerId")
+        void shouldNotNotifyWhenPlanNotFound() {
+            String customerId = "cus_ghost";
+            when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.empty());
+
+            planService.handlePaymentFailed(customerId, "sub_456");
+
+            verify(billingNotificationService, never()).notifyPaymentFailed(any());
         }
     }
 
@@ -284,34 +303,31 @@ class PlanServiceTest {
     class HandleSubscriptionDeletedTests {
 
         @Test
-        @DisplayName("Should downgrade plan to FREE when subscription is deleted")
-        void shouldDowngradeToFreeWhenSubscriptionIsDeleted() {
+        @DisplayName("Should downgrade plan to FREE and notify when plan is found")
+        void shouldDowngradeToFreeAndNotifyWhenPlanFound() {
             String customerId = "cus_123";
-            String subscriptionId = "sub_456";
-            Plan plan = Plan.builder()
-                    .userId("user-123")
-                    .planType(PlanType.PREMIUM)
-                    .stripeCustomerId(customerId)
-                    .stripeSubscriptionId(subscriptionId)
-                    .build();
+            Plan plan = spy(Plan.builder().planType(PlanType.PREMIUM).cityLimit(5).stripeSubscriptionId("sub_456").build());
 
             when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.of(plan));
 
-            planService.handleSubscriptionDeleted(customerId, subscriptionId);
+            planService.handleSubscriptionDeleted(customerId, "sub_456");
 
-            assertThat(plan.getPlanType()).isEqualTo(PlanType.FREE);
+            verify(plan, times(1)).downgradeToFree();
             verify(planRepository, times(1)).save(plan);
+            verify(billingNotificationService, times(1)).notifyCancellation(customerId);
+            assertThat(plan.getPlanType()).isEqualTo(PlanType.FREE);
         }
 
         @Test
-        @DisplayName("Should log warning and skip gracefully when no plan is found for subscription deletion")
-        void shouldLogWarningWhenNoPlanFoundForSubscriptionDeleted() {
+        @DisplayName("Should not notify when no plan is found for the customerId")
+        void shouldNotNotifyWhenPlanNotFoundOnDeletion() {
             String customerId = "cus_ghost";
             when(planRepository.findByStripeCustomerId(customerId)).thenReturn(Optional.empty());
 
             planService.handleSubscriptionDeleted(customerId, "sub_456");
 
             verify(planRepository, never()).save(any());
+            verify(billingNotificationService, never()).notifyCancellation(any());
         }
     }
 
