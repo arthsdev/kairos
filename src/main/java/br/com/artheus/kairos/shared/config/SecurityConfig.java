@@ -53,7 +53,8 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/v3/api-docs/**",
                                 "/v3/api-docs",
-                                "/api/v1/webhooks/stripe"
+                                "/api/v1/webhooks/stripe",
+                                "/api/v1/auth/login"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/occurrences").hasRole("ADMIN")
                         .requestMatchers(HttpMethod.POST,
