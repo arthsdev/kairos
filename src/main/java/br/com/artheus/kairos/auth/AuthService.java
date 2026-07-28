@@ -11,4 +11,8 @@ public class AuthService {
     public LoginResponse login(LoginRequest request) {
         return authClient.login(request.username(), request.password());
     }
+
+    public LoginResponse refresh(RefreshTokenRequest request) {
+        return authClient.refresh(request.refreshToken());
+    }
 }
