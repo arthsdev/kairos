@@ -35,4 +35,20 @@ public class AuthController {
         LoginResponse response = authService.login(loginRequest);
         return ResponseEntity.ok(response);
     }
+
+    @Operation(
+            summary = "Refresh authentication tokens",
+            description = "Exchanges a valid refresh token for a new pair of access and refresh tokens"
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Tokens successfully refreshed"),
+            @ApiResponse(responseCode = "400", description = "Invalid request payload"),
+            @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token"),
+            @ApiResponse(responseCode = "503", description = "Authentication service temporarily unavailable")
+    })
+    @PostMapping("/refresh")
+    public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
+        LoginResponse response = authService.refresh(refreshTokenRequest);
+        return ResponseEntity.ok(response);
+    }
 }

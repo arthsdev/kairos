@@ -6,6 +6,8 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpStatusCode;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Component;
+import org.springframework.util.LinkedMultiValueMap;
+import org.springframework.util.MultiValueMap;
 import org.springframework.web.reactive.function.BodyInserters;
 import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
@@ -33,19 +35,36 @@ public class AuthClient {
     }
 
     public LoginResponse login(String username, String password) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "password");
+        formData.add("client_id", clientId);
+        formData.add("client_secret", clientSecret);
+        formData.add("username", username);
+        formData.add("password", password);
+
+        return requestToken(formData, "Invalid username or password.");
+    }
+
+    public LoginResponse refresh(String refreshToken) {
+        MultiValueMap<String, String> formData = new LinkedMultiValueMap<>();
+        formData.add("grant_type", "refresh_token");
+        formData.add("client_id", clientId);
+        formData.add("client_secret", clientSecret);
+        formData.add("refresh_token", refreshToken);
+
+        return requestToken(formData, "Invalid or expired refresh token.");
+    }
+
+    private LoginResponse requestToken(MultiValueMap<String, String> formData, String invalidCredentialsMessage) {
         String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakUrl, realm);
 
         return webClient.post()
                 .uri(tokenUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
-                .body(BodyInserters.fromFormData("grant_type", "password")
-                        .with("client_id", clientId)
-                        .with("client_secret", clientSecret)
-                        .with("username", username)
-                        .with("password", password))
+                .body(BodyInserters.fromFormData(formData))
                 .retrieve()
                 .onStatus(HttpStatusCode::is4xxClientError, response ->
-                        Mono.error(new AuthenticationFailedException("Invalid username or password."))
+                        Mono.error(new AuthenticationFailedException(invalidCredentialsMessage))
                 )
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                         Mono.error(new AuthenticationServiceUnavailableException("Authentication service is temporarily unavailable."))
