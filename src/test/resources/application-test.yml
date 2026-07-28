@@ -38,4 +38,6 @@ stripe:
 
 KEYCLOAK_URL: http://localhost:8080
 KEYCLOAK_REALM: mock-realm
+KEYCLOAK_CLIENT_ID: mock-client-id
+KEYCLOAK_CLIENT_SECRET: mock-client-secret
 DISCORD_WEBHOOK_URL: http://localhost/mock-webhook

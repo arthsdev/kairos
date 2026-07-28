@@ -120,6 +120,12 @@
 			<artifactId>stripe-java</artifactId>
 			<version>33.1.0</version>
 		</dependency>
+		<dependency>
+			<groupId>com.squareup.okhttp3</groupId>
+			<artifactId>mockwebserver3</artifactId>
+			<version>5.4.0</version>
+			<scope>test</scope>
+		</dependency>
 	</dependencies>
 	<build>
 		<plugins>
