@@ -58,7 +58,7 @@ public class AuthClient {
     private LoginResponse requestToken(MultiValueMap<String, String> formData, String invalidCredentialsMessage) {
         String tokenUrl = String.format("%s/realms/%s/protocol/openid-connect/token", keycloakUrl, realm);
 
-        return webClient.post()
+        KeycloakTokenResponse keycloakResponse = webClient.post()
                 .uri(tokenUrl)
                 .contentType(MediaType.APPLICATION_FORM_URLENCODED)
                 .body(BodyInserters.fromFormData(formData))
@@ -69,7 +69,18 @@ public class AuthClient {
                 .onStatus(HttpStatusCode::is5xxServerError, response ->
                         Mono.error(new AuthenticationServiceUnavailableException("Authentication service is temporarily unavailable."))
                 )
-                .bodyToMono(LoginResponse.class)
+                .bodyToMono(KeycloakTokenResponse.class)
                 .block();
+
+        if (keycloakResponse == null || keycloakResponse.accessToken() == null) {
+            throw new AuthenticationServiceUnavailableException("Identity provider returned an empty token response.");
+        }
+
+        return new LoginResponse(
+                keycloakResponse.accessToken(),
+                keycloakResponse.refreshToken(),
+                keycloakResponse.expiresIn(),
+                keycloakResponse.refreshExpiresIn()
+        );
     }
 }
