@@ -6,11 +6,15 @@ import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.servlet.support.ServletUriComponentsBuilder;
+
+import java.net.URI;
 
 @RestController
 @RequiredArgsConstructor
@@ -36,6 +40,7 @@ public class AuthController {
         return ResponseEntity.ok(response);
     }
 
+    @PostMapping("/refresh")
     @Operation(
             summary = "Refresh authentication tokens",
             description = "Exchanges a valid refresh token for a new pair of access and refresh tokens"
@@ -46,9 +51,24 @@ public class AuthController {
             @ApiResponse(responseCode = "401", description = "Invalid or expired refresh token"),
             @ApiResponse(responseCode = "503", description = "Authentication service temporarily unavailable")
     })
-    @PostMapping("/refresh")
     public ResponseEntity<LoginResponse> refreshToken(@Valid @RequestBody RefreshTokenRequest refreshTokenRequest) {
         LoginResponse response = authService.refresh(refreshTokenRequest);
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/register")
+    @Operation(
+            summary = "Register new user",
+            description = "Provisions a new user account in the identity provider using administrative credentials."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "201", description = "User successfully registered"),
+            @ApiResponse(responseCode = "400", description = "Invalid request payload or validation errors"),
+            @ApiResponse(responseCode = "409", description = "User with given email or username already exists"),
+            @ApiResponse(responseCode = "503", description = "Identity provider service temporarily unavailable")
+    })
+    public ResponseEntity<RegisterResponse> register(@Valid @RequestBody RegisterRequest registerRequest) {
+        RegisterResponse response = authService.register(registerRequest);
+        return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
 }

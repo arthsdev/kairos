@@ -37,3 +37,4 @@ build/
 *.env
 application-local.properties
 application-local.yml
+**/keycloak/data/import/master-realm.json
