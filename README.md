@@ -200,23 +200,43 @@ A API sobe em `http://localhost:8081`. O Swagger UI fica disponível em `http://
 
 ## Autenticação e como testar a API
 
-O sistema usa Keycloak como Authorization Server (OAuth2 / JWT). Para testar endpoints protegidos:
-
-1. Suba o ambiente (`docker compose up -d`)
-2. Obtenha um token via Keycloak (usuários `admin` e `test02` já vêm pré-cadastrados no realm importado):
+O sistema usa Keycloak como Authorization Server (OAuth2 / JWT), mas o frontend/cliente nunca fala diretamente com o Keycloak — o backend expõe um proxy fino, mantendo o `client_secret` sempre do lado do servidor:
 
 ```bash
-curl -X POST http://localhost:8080/realms/kairos/protocol/openid-connect/token \
-  -H "Content-Type: application/x-www-form-urlencoded" \
-  -d "grant_type=password" \
-  -d "client_id=kairos-api" \
-  -d "client_secret=kairos-local-dev-secret" \
-  -d "username=test02" \
-  -d "password=<senha do usuário>"
+# Registro de novo usuário
+curl -X POST http://localhost:8081/api/v1/auth/register \
+  -H "Content-Type: application/json" \
+  -d '{
+    "username": "novousuario",
+    "email": "novo@kairos.com",
+    "password": "SenhaForte123!",
+    "firstName": "Novo",
+    "lastName": "Usuario"
+  }'
+
+# Login (usuários admin e test02 já vêm pré-cadastrados no realm importado)
+curl -X POST http://localhost:8081/api/v1/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{ "username": "test02", "password": "<senha do usuário>" }'
+
+# Renovação de sessão (access token expira em 5 minutos)
+curl -X POST http://localhost:8081/api/v1/auth/refresh \
+  -H "Content-Type: application/json" \
+  -d '{ "refreshToken": "<refresh_token retornado no login>" }'
 ```
 
-3. Use o `access_token` retornado no header `Authorization: Bearer <token>` das requisições subsequentes (via Insomnia, Postman ou pelo próprio Swagger UI, que possui suporte a autorização OAuth2 embutido)
+Use o `accessToken` retornado no header `Authorization: Bearer <token>` das requisições subsequentes (via Insomnia, Postman ou pelo próprio Swagger UI, que possui suporte a autorização OAuth2 embutido).
 
+### Por que dois clients Keycloak
+
+- **`kairos-api`**: autentica usuários finais (`login`/`refresh`), sem privilégio administrativo
+- **`kairos-admin-service`**: usado exclusivamente pelo endpoint de `register`, com a role `manage-users` (não admin total do realm), seguindo o princípio de menor privilégio — se o secret de um vazar, o outro fluxo continua protegido
+
+### Nota de segurança sobre os secrets versionados
+
+Os secrets dos dois clients (`kairos-local-dev-secret` e `kairos-admin-service-local-dev-only-secret`) são valores triviais, versionados de propósito no realm export (`keycloak/kairos-realm.json`), para permitir `git clone && docker compose up` sem nenhum ajuste manual.
+
+Isso é seguro **apenas** porque o Keycloak roda localmente e não é exposto publicamente neste setup de desenvolvimento. **Ambos os secrets devem ser regenerados e injetados via variável de ambiente antes de qualquer deploy em produção** — nunca reutilize este realm export, como está, em um ambiente acessível pela internet.
 ## Testes
 
 ```bash
