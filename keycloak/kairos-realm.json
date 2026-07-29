@@ -627,7 +627,7 @@
     "enabled" : true,
     "alwaysDisplayInConsole" : false,
     "clientAuthenticatorType" : "client-secret",
-    "secret" : "6EgVU3q2CHyUTThCBizzmdE1Q0mws3ZB",
+    "secret" : "kairos-admin-service-local-dev-only-secret",
     "redirectUris" : [ "/*" ],
     "webOrigins" : [ "/*" ],
     "notBefore" : 0,
