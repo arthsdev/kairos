@@ -154,20 +154,39 @@ class OccurrenceControllerTest {
 
     @Nested
     @DisplayName("GET /api/v1/occurrences")
-    class ListVerifiedOccurrencesTests {
+    class ListOccurrencesTests {
 
         @SuppressWarnings("unchecked")
         @Test
-        @DisplayName("Should return paginated list of verified occurrences")
-        void shouldReturnPaginatedVerifiedOccurrences() throws Exception {
+        @DisplayName("Should return paginated list of occurrences when no status filter is provided")
+        void shouldReturnPaginatedOccurrencesWithoutStatus() throws Exception {
             PaginatedResponse<OccurrenceResponse> paginatedResponse = mock(PaginatedResponse.class);
             when(paginatedResponse.data()).thenReturn(List.of(createMockResponse()));
 
-            when(occurrenceService.getVerifiedOccurrences(any(Pageable.class)))
+            when(occurrenceService.getOccurrences(isNull(), any(Pageable.class)))
                     .thenReturn(paginatedResponse);
 
             mockMvc.perform(get("/api/v1/occurrences")
                             .with(jwt())
+                            .param("page", "0")
+                            .param("size", "10"))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$.data").isArray());
+        }
+
+        @SuppressWarnings("unchecked")
+        @Test
+        @DisplayName("Should return paginated list of occurrences filtered by status")
+        void shouldReturnPaginatedOccurrencesWithStatusFilter() throws Exception {
+            PaginatedResponse<OccurrenceResponse> paginatedResponse = mock(PaginatedResponse.class);
+            when(paginatedResponse.data()).thenReturn(List.of(createMockResponse()));
+
+            when(occurrenceService.getOccurrences(eq(OccurrenceStatus.VERIFIED), any(Pageable.class)))
+                    .thenReturn(paginatedResponse);
+
+            mockMvc.perform(get("/api/v1/occurrences")
+                            .with(jwt())
+                            .param("status", "VERIFIED")
                             .param("page", "0")
                             .param("size", "10"))
                     .andExpect(status().isOk())

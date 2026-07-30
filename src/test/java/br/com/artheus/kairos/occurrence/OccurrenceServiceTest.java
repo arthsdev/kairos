@@ -66,7 +66,7 @@ class OccurrenceServiceTest {
         void shouldCreateOccurrenceSuccessfully() {
             OccurrenceRequest request = new OccurrenceRequest(
                     "Landslide on main road", "Heavy rain caused landslide", OccurrenceCategory.LANDSLIDE,
-                    OccurrenceSeverity.HIGH, -23.55, -46.63, "http://image.com/landslide.jpg", "city-123"
+                    OccurrenceSeverity.HIGH, -23.55, -46.63, "https://image.com/landslide.jpg", "city-123"
             );
             String userId = "user-123";
 
@@ -87,26 +87,49 @@ class OccurrenceServiceTest {
     }
 
     @Nested
-    @DisplayName("Tests for getVerifiedOccurrences()")
-    class GetVerifiedOccurrences {
+    @DisplayName("Tests for getOccurrences()")
+    class GetOccurrences {
 
         @Test
-        @DisplayName("Should return paginated verified occurrences")
-        void shouldReturnPaginatedVerifiedOccurrences() {
+        @DisplayName("Should return paginated occurrences filtered by status with admin privileges")
+        void shouldReturnPaginatedOccurrencesWithStatusAsAdmin() {
             Pageable pageable = PageRequest.of(0, 10);
             Occurrence occurrence = Occurrence.builder().status(OccurrenceStatus.VERIFIED).build();
             Page<Occurrence> page = new PageImpl<>(List.of(occurrence));
 
-            when(securityService.getCurrentUserId()).thenReturn("user-123");
-            when(securityService.isAdmin()).thenReturn(false);
+            when(securityService.getCurrentUserId()).thenReturn("admin-123");
+            when(securityService.isAdmin()).thenReturn(true);
             when(occurrenceRepository.findAllByStatusAndDeletedAtIsNull(OccurrenceStatus.VERIFIED, pageable))
                     .thenReturn(page);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("user-123"), eq(false)))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
 
-            PaginatedResponse<OccurrenceResponse> response = occurrenceService.getVerifiedOccurrences(pageable);
+            PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(OccurrenceStatus.VERIFIED, pageable);
 
             assertThat(response.data()).hasSize(1);
+            assertThat(response.data().getFirst().actions()).isEqualTo(dummyActions);
+            verify(occurrenceRepository).findAllByStatusAndDeletedAtIsNull(OccurrenceStatus.VERIFIED, pageable);
+        }
+
+        @Test
+        @DisplayName("Should return all paginated occurrences when status is null with admin privileges")
+        void shouldReturnAllPaginatedOccurrencesWhenStatusIsNullAsAdmin() {
+            Pageable pageable = PageRequest.of(0, 10);
+            Occurrence occurrence = Occurrence.builder().status(OccurrenceStatus.PENDING).build();
+            Page<Occurrence> page = new PageImpl<>(List.of(occurrence));
+
+            when(securityService.getCurrentUserId()).thenReturn("admin-123");
+            when(securityService.isAdmin()).thenReturn(true);
+            when(occurrenceRepository.findAllByDeletedAtIsNull(pageable))
+                    .thenReturn(page);
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
+                    .thenReturn(dummyActions);
+
+            PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(null, pageable);
+
+            assertThat(response.data()).hasSize(1);
+            assertThat(response.data().getFirst().actions()).isEqualTo(dummyActions);
+            verify(occurrenceRepository).findAllByDeletedAtIsNull(pageable);
         }
     }
 
@@ -170,8 +193,8 @@ class OccurrenceServiceTest {
             List<OccurrenceSummary> result = occurrenceService.findVerifiedByCityId(cityId);
 
             assertThat(result).hasSize(1);
-            assertThat(result.get(0).cityId()).isEqualTo(cityId);
-            assertThat(result.get(0).category()).isEqualTo(OccurrenceCategory.FLOOD);
+            assertThat(result.getFirst().cityId()).isEqualTo(cityId);
+            assertThat(result.getFirst().category()).isEqualTo(OccurrenceCategory.FLOOD);
         }
     }
 

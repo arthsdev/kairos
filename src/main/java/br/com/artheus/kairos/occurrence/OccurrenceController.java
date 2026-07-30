@@ -47,17 +47,20 @@ public class OccurrenceController {
 
     @GetMapping
     @Operation(
-            summary = "List verified occurrences",
-            description = "Retrieves a paginated list of all occurrences that have already been verified by the system."
+            summary = "List all occurrences",
+            description = "Retrieves a paginated list of all occurrences in the system, optionally filtered by status. Restricted to ADMIN."
     )
     @ApiResponses(value = {
             @ApiResponse(responseCode = "200", description = "List retrieved successfully"),
-            @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token")
+            @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token"),
+            @ApiResponse(responseCode = "403", description = "User does not have ADMIN role")
     })
-    public ResponseEntity<PaginatedResponse<OccurrenceResponse>> listVerifiedOccurrences(
+    public ResponseEntity<PaginatedResponse<OccurrenceResponse>> listOccurrences(
+            @Parameter(description = "Optional status to filter occurrences")
+            @RequestParam(required = false) OccurrenceStatus status,
             @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
 
-        return ResponseEntity.ok(occurrenceService.getVerifiedOccurrences(pageable));
+        return ResponseEntity.ok(occurrenceService.getOccurrences(status, pageable));
     }
 
     @Operation(
