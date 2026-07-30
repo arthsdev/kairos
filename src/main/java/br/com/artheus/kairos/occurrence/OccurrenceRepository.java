@@ -16,4 +16,6 @@ public interface OccurrenceRepository extends JpaRepository<Occurrence, String> 
     Page<Occurrence> findAllByUserIdAndDeletedAtIsNull(String userId, Pageable pageable);
 
     Page<Occurrence> findAllByUserIdAndStatusAndDeletedAtIsNull(String userId, OccurrenceStatus status, Pageable pageable);
+
+    Page<Occurrence> findAllByDeletedAtIsNull(Pageable pageable);
 }

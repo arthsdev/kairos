@@ -47,20 +47,25 @@ public class OccurrenceService implements OccurrenceDataProvider {
     }
 
     @Transactional(readOnly = true)
-    public PaginatedResponse<OccurrenceResponse> getVerifiedOccurrences(Pageable pageable) {
-
+    public PaginatedResponse<OccurrenceResponse> getOccurrences(OccurrenceStatus status, Pageable pageable) {
         String currentUserId = securityService.getCurrentUserId();
         boolean isAdmin = securityService.isAdmin();
 
-        Page<OccurrenceResponse> page = occurrenceRepository
-                .findAllByStatusAndDeletedAtIsNull(OccurrenceStatus.VERIFIED, pageable)
-                .map(occurrence ->
-                        OccurrenceResponse.from(
-                                occurrence,
-                                occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin)
-                        ));
+        Page<Occurrence> occurrencePage;
+        if (status != null) {
+            occurrencePage = occurrenceRepository.findAllByStatusAndDeletedAtIsNull(status, pageable);
+        } else {
+            occurrencePage = occurrenceRepository.findAllByDeletedAtIsNull(pageable);
+        }
 
-        return new PaginatedResponse<>(page);
+        Page<OccurrenceResponse> responsePage = occurrencePage.map(occurrence ->
+                OccurrenceResponse.from(
+                        occurrence,
+                        occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin)
+                )
+        );
+
+        return new PaginatedResponse<>(responsePage);
     }
 
     @Transactional(readOnly = true)
@@ -75,7 +80,6 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
         boolean isAdmin = securityService.isAdmin();
 
-        // Maps the entity page to DTOs using lambda with the calculator
         Page<OccurrenceResponse> responsePage = occurrencePage.map(occurrence ->
                 OccurrenceResponse.from(
                         occurrence,
