@@ -1,5 +1,6 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.anonymization.UserReferenceService;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceDataProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.contract.security.SecurityService;
@@ -22,6 +23,7 @@ public class OccurrenceService implements OccurrenceDataProvider {
     private final OccurrenceRepository occurrenceRepository;
     private final SecurityService securityService;
     private final OccurrenceActionsCalculator occurrenceActionsCalculator;
+    private final UserReferenceService userReferenceService;
 
     @Transactional
     public OccurrenceResponse createOccurrence(OccurrenceRequest request, String userId) {
@@ -61,7 +63,8 @@ public class OccurrenceService implements OccurrenceDataProvider {
         Page<OccurrenceResponse> responsePage = occurrencePage.map(occurrence ->
                 OccurrenceResponse.from(
                         occurrence,
-                        occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin)
+                        occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin),
+                        userReferenceService.getDisplayId(occurrence.getUserId())
                 )
         );
 

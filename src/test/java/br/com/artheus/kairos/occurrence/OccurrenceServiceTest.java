@@ -1,5 +1,6 @@
 package br.com.artheus.kairos.occurrence;
 
+import br.com.artheus.kairos.anonymization.UserReferenceService;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
@@ -46,6 +47,9 @@ class OccurrenceServiceTest {
 
     @InjectMocks
     private OccurrenceService occurrenceService;
+
+    @Mock
+    private UserReferenceService userReferenceService;
 
     @Captor
     private ArgumentCaptor<Occurrence> occurrenceCaptor;
@@ -103,6 +107,8 @@ class OccurrenceServiceTest {
                     .thenReturn(page);
             when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
+            when(userReferenceService.getDisplayId(any()))
+                    .thenReturn("#12345");
 
             PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(OccurrenceStatus.VERIFIED, pageable);
 
@@ -124,6 +130,8 @@ class OccurrenceServiceTest {
                     .thenReturn(page);
             when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
+            when(userReferenceService.getDisplayId(any()))
+                    .thenReturn("#12345");
 
             PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(null, pageable);
 

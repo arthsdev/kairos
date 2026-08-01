@@ -107,15 +107,17 @@ br.com.artheus.kairos
 ├── payment        → integração Stripe (checkout, parsing de eventos de webhook)
 ├── cities         → cidades monitoradas, geocoding externo (Open-Meteo)
 ├── notification   → disparo de alertas via Discord webhook (canal único, reutilizável)
+├── anonymization  → pseudonimização reversível de denunciantes (UserReference), para exibição anônima em contexto de moderação
 └── shared
     ├── contract    → DTOs e interfaces cruzando módulos (Dependency Inversion)
     ├── enums
     ├── exception
     ├── config
-    └── security
+    ├── security
+    └── filter      → FirstAccessProvisioningFilter (provisionamento de primeiro acesso: plano + user reference)
 ```
 
-A pasta `shared/contract` existe especificamente para permitir que módulos se comuniquem via interfaces, sem depender diretamente da implementação uns dos outros — por exemplo, `risk` consome um `ClimateInput` e uma lista de `OccurrenceSummary` sem conhecer `ClimateService` ou `OccurrenceService` diretamente; `plan` dispara notificações através de `NotificationSender` sem saber que a implementação real é um webhook do Discord.
+O `shared/contract` existe especificamente para permitir que módulos se comuniquem via interfaces, sem depender diretamente da implementação uns dos outros — por exemplo, `risk` consome um `ClimateInput` e uma lista de `OccurrenceSummary` sem conhecer `ClimateService` ou `OccurrenceService` diretamente; `plan` dispara notificações através de `NotificationSender` sem saber que a implementação real é um webhook do Discord.
 
 ### `occurrence`
 
@@ -124,6 +126,7 @@ A pasta `shared/contract` existe especificamente para permitir que módulos se c
 - Distinção explícita entre `ForbiddenException` (403 — falha de autorização) e `BusinessException` (422 — violação de regra de negócio)
 - Endpoints `POST /{id}/verify` e `POST /{id}/resolve`, restritos a ADMIN, com defesa em profundidade (bloqueio tanto no `SecurityConfig` quanto na camada de service)
 - Cada `OccurrenceResponse` carrega um objeto `OccurrenceActions` (`canEdit`, `canDelete`, `canVerify`, `canResolve`) pré-calculado pelo backend — o frontend não precisa duplicar lógica de permissão, só ler o resultado
+- Na visão de moderação do admin (`GET /occurrences`), cada ocorrência também carrega um `reporterDisplayId` anônimo (ex: `#12345`) no lugar do UUID do denunciante — ver `anonymization` e "Decisões de design"
 
 ### `risk` — o motor de decisão
 
@@ -139,7 +142,8 @@ A pasta `shared/contract` existe especificamente para permitir que módulos se c
 ### `plan` — assinaturas e ciclo de vida
 
 - Três estados: `TRIAL` (7 dias, criado automaticamente no primeiro acesso), `FREE`, `PREMIUM` (mensal, via Stripe)
-- `PlanFirstAccessFilter`: garante que todo usuário autenticado tenha um plano, com cache em Redis (TTL de 24h) para evitar consulta redundante ao banco a cada requisição
+- Provisionamento do plano no primeiro acesso é feito via `FirstAccessProvisioningFilter` (`shared/filter`) — um filtro compartilhado que também provisiona a `UserReference` do usuário (ver `anonymization`) no mesmo momento, evitando duplicar o mecanismo de "primeira requisição autenticada, com cache" para cada nova entidade que precisar desse padrão
+- Cache em Redis (TTL configurável) evita consulta redundante ao banco a cada requisição
 - Scheduler (`checkExpiredPlans`) rebaixa apenas planos `TRIAL` expirados — um plano `PREMIUM` **nunca** é rebaixado por expiração de data local; só é rebaixado reativamente, via webhook de cancelamento do Stripe (evita cortar acesso de um cliente pagante por atraso ou falha de um webhook de renovação)
 - Constraint `UNIQUE` em `plans.user_id` no banco, com tratamento gracioso de condição de corrida na criação concorrente do plano inicial
 
@@ -159,6 +163,13 @@ A pasta `shared/contract` existe especificamente para permitir que módulos se c
 
 - `NotificationSender`: interface genérica (`sendNotification(String message)`) — desacoplada de qualquer caso de uso específico, reutilizada tanto para alertas de risco (`RiskService`) quanto para eventos de billing (`BillingNotificationService`)
 - Única implementação hoje: `DiscordWebhookNotificationSender`, mandando para um canal fixo — outras implementações (e-mail, WhatsApp) podem ser adicionadas futuramente atrás da mesma interface, sem alterar quem a consome
+
+### `anonymization`
+
+- `UserReference`: tabela local mínima (`keycloakUserId` + `id` autoincrement + `createdAt`), mapeando usuários do Keycloak para um identificador sequencial — sem duplicar nenhum dado de identidade (nome, e-mail, senha continuam só no Keycloak), só uma referência
+- Populada sob demanda via `FirstAccessProvisioningFilter`, no mesmo momento em que o plano é provisionado — nenhum job de sincronização em lote, nenhuma pré-população
+- `ensureUserReferenceExists` trata a condição de corrida de duas requisições concorrentes tentando criar a referência do mesmo usuário simultaneamente, recuperando de `DataIntegrityViolationException` (a constraint `UNIQUE` em `keycloak_user_id` garante a integridade; o catch só evita que a segunda requisição quebre)
+- `getDisplayId(userId)` expõe o identificador formatado (`#12345`), usado hoje como `reporterDisplayId` na visão de moderação do admin — ver "Decisões de design" para o raciocínio completo por trás dessa escolha
 
 ## Assinaturas e pagamento (Stripe)
 
@@ -192,7 +203,7 @@ docker compose up -d
 mvn spring-boot:run
 ```
 
-O `.env.example` já vem com valores de desenvolvimento prontos (incluindo usuários e client secret do Keycloak pré-configurados via realm export versionado) — não é necessário nenhum ajuste manual para rodar a aplicação e a suíte de testes.
+O `.env.example` já vem com valores de desenvolvimento prontos (incluindo usuários e client secrets do Keycloak pré-configurados via realm export versionado) — não é necessário nenhum ajuste manual para rodar a aplicação e a suíte de testes.
 
 Para testar o fluxo de pagamento real, é necessário preencher as próprias credenciais de teste do Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PREMIUM_PRICE_ID`) e rodar `stripe listen --forward-to localhost:8081/api/v1/webhooks/stripe` para receber webhooks localmente — sem isso, o restante do sistema funciona normalmente.
 
@@ -237,6 +248,7 @@ Use o `accessToken` retornado no header `Authorization: Bearer <token>` das requ
 Os secrets dos dois clients (`kairos-local-dev-secret` e `kairos-admin-service-local-dev-only-secret`) são valores triviais, versionados de propósito no realm export (`keycloak/kairos-realm.json`), para permitir `git clone && docker compose up` sem nenhum ajuste manual.
 
 Isso é seguro **apenas** porque o Keycloak roda localmente e não é exposto publicamente neste setup de desenvolvimento. **Ambos os secrets devem ser regenerados e injetados via variável de ambiente antes de qualquer deploy em produção** — nunca reutilize este realm export, como está, em um ambiente acessível pela internet.
+
 ## Testes
 
 ```bash
@@ -251,7 +263,7 @@ A suíte inteira roda **sem necessidade de infraestrutura real** (Docker não pr
 
 Cobertura por módulo — todos os módulos possuem testes automatizados cobrindo entidade/domínio, service (com mocks), controller (`@WebMvcTest`, quando aplicável) e, no caso de `occurrence`, também repositório (`@DataJpaTest` com H2 real):
 
-`occurrence` · `risk` (calculator, properties, service, consumer, producer) · `climate` (validação, service, consumer, producer) · `plan` (entidade, service, filtro de primeiro acesso) · `payment` (checkout service, parser de eventos, controller de webhook) · `cities` (geocoding, limite de plano) · `notification` (sender) · segurança (`KeycloakRoleConverter`)
+`occurrence` · `risk` (calculator, properties, service, consumer, producer) · `climate` (validação, service, consumer, producer) · `plan` (entidade, service) · `anonymization` (entidade, service, incluindo tratamento de condição de corrida) · `payment` (checkout service, parser de eventos, controller de webhook) · `cities` (geocoding, limite de plano) · `notification` (sender) · segurança (`KeycloakRoleConverter`, `FirstAccessProvisioningFilter`)
 
 ## Decisões de design
 
@@ -266,15 +278,15 @@ Algumas escolhas deliberadas, documentadas aqui porque costumam gerar boas pergu
 - **`switch` exaustivo sobre enums, sem `default` silencioso**: preferido a um `default` genérico, para que a adição futura de um novo valor ao enum gere erro de compilação em vez de comportamento silenciosamente incorreto.
 - **`NotificationSender` genérico, sem `recipient` especulativo**: a interface expõe só `sendNotification(String message)` — um parâmetro de destinatário foi deliberadamente omitido até que exista um canal real que precise dele (a única implementação hoje, Discord, usa um canal fixo sem discriminação por pessoa).
 - **YAGNI aplicado a testes**: métodos gerados automaticamente pelo compilador (`equals`/`hashCode`/`toString` de records) não são testados — são responsabilidade da linguagem, não do domínio.
+- **`FirstAccessProvisioningFilter` generalizado em vez de um filtro por entidade**: quando surgiu a necessidade de provisionar uma segunda entidade (`UserReference`) no primeiro acesso, além do `Plan` já existente, o filtro original (`PlanFirstAccessFilter`) foi generalizado em vez de duplicado — um segundo filtro faria a mesma dança técnica (checar cache, criar se ausente) para outro domínio, duplicando mecanismo em vez de lógica de negócio. Uma interface genérica de "provisionador" foi cogitada e descartada por generalização prematura: com apenas dois casos concretos e nenhum terceiro previsto, o custo da abstração não se paga.
+- **Anonimização reversível do denunciante (`reporterDisplayId`)**: ocorrências mostram um identificador anônimo (`#12345`, derivado do ID sequencial de uma tabela local de referência) em vez do UUID do Keycloak, reduzindo viés de moderação e exposição desnecessária de identidade. Um hash determinístico sem persistência foi cogitado primeiro, mas descartado: sem uma tabela de mapeamento, não haveria como reverter o identificador de volta ao usuário real em caso de necessidade legítima (investigação de abuso, ordem judicial) — o mesmo problema de exposição indevida, só que na direção oposta. O campo só é populado na visão de moderação do admin — na resposta ao próprio criador da ocorrência, permanece `null`, o que também evita que o usuário conheça seu próprio identificador anônimo (benefício incidental: sem esse número, não há como inferir metadados do sistema, como contagem aproximada de usuários, a partir da própria conta).
 
 ## Débitos técnicos e limitações conhecidas
-
-Documentados intencionalmente, em vez de escondidos — parte do processo de manter o escopo de cada branch/PR focado:
 
 - Sem Circuit Breaker nas integrações externas (Resilience4j ainda imaturo na versão atual do Spring Boot usada)
 - Sem monitoramento/reprocessamento de Dead Letter Queue no RabbitMQ
 - Notificações de billing (falha de pagamento, cancelamento) hoje vão para o mesmo canal Discord operacional dos alertas de risco — não chegam ao usuário final diretamente. Um canal pessoal de verdade (e-mail via SMTP) exigiria uma nova implementação de `NotificationSender`
-- `PlanFirstAccessFilter`: o cache Redis (TTL 24h) pode dessincronizar da fonte de verdade (MySQL) em cenários raros de reset independente dos dois armazenamentos; o tratamento de erro do filtro também não possui métrica/alerta, apenas log
+- `FirstAccessProvisioningFilter`: o cache Redis pode dessincronizar da fonte de verdade (MySQL/Postgres) em cenários raros de reset independente dos dois armazenamentos; o tratamento de erro do filtro também não possui métrica/alerta, apenas log
 - Sem testes automatizados para o cliente/scheduler de integração com a API climática externa (parsing da resposta do Open-Meteo em si)
 
 ## Roadmap

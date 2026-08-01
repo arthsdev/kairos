@@ -1,7 +1,8 @@
 package br.com.artheus.kairos.shared.config;
 
+import br.com.artheus.kairos.anonymization.UserReferenceService;
 import br.com.artheus.kairos.plan.PlanService;
-import br.com.artheus.kairos.plan.filter.PlanFirstAccessFilter;
+import br.com.artheus.kairos.shared.filter.FirstAccessProvisioningFilter;
 import br.com.artheus.kairos.shared.security.KairosAccessDeniedHandler;
 import br.com.artheus.kairos.shared.security.KeycloakRoleConverter;
 import lombok.RequiredArgsConstructor;
@@ -26,6 +27,7 @@ public class SecurityConfig {
     private final StringRedisTemplate redisTemplate;
     private final KairosAccessDeniedHandler accessDeniedHandler;
     private final CorsConfigurationSource corsConfigurationSource;
+    private final UserReferenceService userReferenceService;
 
     @Bean
     public JwtAuthenticationConverter jwtAuthenticationConverter() {
@@ -35,8 +37,8 @@ public class SecurityConfig {
     }
 
     @Bean
-    public PlanFirstAccessFilter planFirstAccessFilter() {
-        return new PlanFirstAccessFilter(planService, redisTemplate);
+    public FirstAccessProvisioningFilter firstAccessProvisioningFilter() {
+        return new FirstAccessProvisioningFilter(planService, userReferenceService, redisTemplate);
     }
 
     @Bean
@@ -46,7 +48,7 @@ public class SecurityConfig {
                 .csrf(csrf -> csrf.disable())
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
-                .addFilterAfter(planFirstAccessFilter(), BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(firstAccessProvisioningFilter(), BearerTokenAuthenticationFilter.class)
                 .exceptionHandling(ex -> ex
                         .accessDeniedHandler(accessDeniedHandler)
                 )
