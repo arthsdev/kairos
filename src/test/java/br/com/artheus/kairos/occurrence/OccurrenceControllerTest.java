@@ -101,6 +101,7 @@ class OccurrenceControllerTest {
                 0.0,
                 "url",
                 "user-789",
+                "#12345",
                 LocalDateTime.now(),
                 "city-123",
                 new OccurrenceActions(true, true, false, false)

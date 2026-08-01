@@ -18,12 +18,17 @@ public record OccurrenceResponse(
         Double longitude,
         String imageUrl,
         String userId,
+        String reporterDisplayId,
         LocalDateTime createdAt,
         String cityId,
         OccurrenceActions actions
 ) {
 
     public static OccurrenceResponse from(Occurrence occurrence, OccurrenceActions actions) {
+        return from(occurrence, actions, null);
+    }
+
+    public static OccurrenceResponse from(Occurrence occurrence, OccurrenceActions actions, String reporterDisplayId) {
         return new OccurrenceResponse(
                 occurrence.getId(),
                 occurrence.getTitle(),
@@ -35,6 +40,7 @@ public record OccurrenceResponse(
                 occurrence.getLongitude(),
                 occurrence.getImageUrl(),
                 occurrence.getUserId(),
+                reporterDisplayId,
                 occurrence.getCreatedAt(),
                 occurrence.getCityId(),
                 actions

@@ -1,5 +1,6 @@
-package br.com.artheus.kairos.plan.filter;
+package br.com.artheus.kairos.shared.filter;
 
+import br.com.artheus.kairos.anonymization.UserReferenceService;
 import br.com.artheus.kairos.plan.PlanService;
 import jakarta.servlet.FilterChain;
 import jakarta.servlet.ServletException;
@@ -19,9 +20,10 @@ import java.time.Duration;
 
 @Slf4j
 @RequiredArgsConstructor
-public class PlanFirstAccessFilter extends OncePerRequestFilter {
+public class FirstAccessProvisioningFilter extends OncePerRequestFilter {
 
     private final PlanService planService;
+    private final UserReferenceService userReferenceService;
     private final StringRedisTemplate redisTemplate;
 
     @Value("${kairos.plan.cache-ttl:PT1H}")
@@ -39,21 +41,21 @@ public class PlanFirstAccessFilter extends OncePerRequestFilter {
                 String userId = jwtAuth.getToken().getSubject();
 
                 if (userId != null) {
-                    String cacheKey = "user:plan:" + userId;
-
-                    String cachedPlan = redisTemplate.opsForValue().get(cacheKey);
-
-                    if (cachedPlan == null) {
-                        planService.ensurePlanExists(userId);
-
-                        redisTemplate.opsForValue().set(cacheKey, "exists", cacheTtl);
-                    }
+                    ensureOnce("user:plan:" + userId, () -> planService.ensurePlanExists(userId));
+                    ensureOnce("user:reference:" + userId, () -> userReferenceService.ensureUserReferenceExists(userId));
                 }
             }
         } catch (Exception e) {
-            log.error("Error verifying or registering first-access plan in Redis/Database", e);
+            log.error("Error during first-access provisioning", e);
         } finally {
             filterChain.doFilter(request, response);
+        }
+    }
+
+    private void ensureOnce(String cacheKey, Runnable action) {
+        if (redisTemplate.opsForValue().get(cacheKey) == null) {
+            action.run();
+            redisTemplate.opsForValue().set(cacheKey, "exists", cacheTtl);
         }
     }
 }
