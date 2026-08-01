@@ -2,6 +2,7 @@ package br.com.artheus.kairos.plan;
 
 import br.com.artheus.kairos.shared.contract.payment.PaymentCheckoutProvider;
 import br.com.artheus.kairos.shared.contract.payment.PaymentWebhookProcessor;
+import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import lombok.RequiredArgsConstructor;
@@ -22,6 +23,7 @@ public class PlanService implements PaymentWebhookProcessor {
     private final PlanRepository planRepository;
     private final PaymentCheckoutProvider paymentCheckoutProvider;
     private final BillingNotificationService billingNotificationService;
+    private final SecurityService securityService;
 
     public PlanResponse createPlan(String userId) {
 
@@ -34,7 +36,12 @@ public class PlanService implements PaymentWebhookProcessor {
     }
 
     public CheckoutSessionResponse startPremiumCheckout(String userId) {
+
         Plan plan = findPlanOrThrow(userId);
+
+        if (securityService.isAdmin()) {
+            throw new BusinessException("Admin accounts cannot purchase a subscription upgrade");
+        }
 
         ensureNotAlreadyPremium(plan);
 
