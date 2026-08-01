@@ -1,6 +1,7 @@
 package br.com.artheus.kairos.plan;
 
 import br.com.artheus.kairos.shared.contract.payment.PaymentCheckoutProvider;
+import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import org.junit.jupiter.api.DisplayName;
@@ -21,6 +22,7 @@ import java.util.Optional;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.*;
 
 @ExtendWith(MockitoExtension.class)
@@ -38,6 +40,9 @@ class PlanServiceTest {
 
     @Mock
     private BillingNotificationService billingNotificationService;
+
+    @Mock
+    private SecurityService securityService;
 
     @InjectMocks
     private PlanService planService;
@@ -74,6 +79,7 @@ class PlanServiceTest {
             Plan plan = Plan.builder().userId(userId).planType(PlanType.FREE).build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
+            when(securityService.isAdmin()).thenReturn(false);
             when(paymentCheckoutProvider.createCheckoutSession(userId)).thenReturn(expectedCheckoutUrl);
 
             CheckoutSessionResponse response = planService.startPremiumCheckout(userId);
@@ -84,12 +90,29 @@ class PlanServiceTest {
         }
 
         @Test
+        @DisplayName("Should throw BusinessException when admin tries to start premium checkout")
+        void shouldThrowExceptionWhenAdminTriesToStartCheckout() {
+            String adminUserId = "admin-123";
+            Plan plan = Plan.builder().userId(adminUserId).planType(PlanType.FREE).build();
+
+            when(planRepository.findByUserId(adminUserId)).thenReturn(Optional.of(plan));
+            when(securityService.isAdmin()).thenReturn(true);
+
+            assertThatThrownBy(() -> planService.startPremiumCheckout(adminUserId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("Admin accounts cannot purchase a subscription upgrade");
+
+            verify(paymentCheckoutProvider, never()).createCheckoutSession(any());
+        }
+
+        @Test
         @DisplayName("Should throw BusinessException when plan is already PREMIUM during checkout start")
         void shouldThrowExceptionWhenStartingCheckoutForAlreadyPremiumPlan() {
             String userId = "user-premium";
             Plan plan = Plan.builder().userId(userId).planType(PlanType.PREMIUM).build();
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
+            when(securityService.isAdmin()).thenReturn(false);
 
             assertThatThrownBy(() -> planService.startPremiumCheckout(userId))
                     .isInstanceOf(BusinessException.class)

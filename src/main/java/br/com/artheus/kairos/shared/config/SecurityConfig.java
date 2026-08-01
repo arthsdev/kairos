@@ -64,6 +64,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/register"
                         ).permitAll()
                         .requestMatchers(HttpMethod.GET, "/api/v1/occurrences").hasRole("ADMIN")
+                        .requestMatchers(HttpMethod.POST, "/api/v1/plans/upgrade").hasRole("USER")
                         .requestMatchers(HttpMethod.POST,
                                 "/api/v1/occurrences/*/verify",
                                 "/api/v1/occurrences/*/resolve"
