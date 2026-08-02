@@ -56,10 +56,17 @@ public class MonitoredCityService implements CityProvider {
     }
 
     @Transactional
-    public MonitoredCityResponse addCityToMonitor(String cityName, String userId) {
+    public MonitoredCityResponse addCityToMonitor(AddCityRequest request, String userId) {
         validateUserPlanLimit(userId);
 
-        GeocodingResult geocodingResult = fetchCityFromExternalApi(cityName);
+        GeocodingResult geocodingResult = new GeocodingResult(
+                request.name(),
+                request.latitude(),
+                request.longitude(),
+                request.admin1(),
+                request.country()
+        );
+
         City city = getOrCreateCity(geocodingResult);
 
         validateUniqueMonitoring(userId, city.getId());
@@ -158,18 +165,8 @@ public class MonitoredCityService implements CityProvider {
         }
     }
 
-    private GeocodingResult fetchCityFromExternalApi(String cityName) {
-        GeocodingResponse geocoding = this.searchCity(cityName);
-
-        if (geocoding.results() == null || geocoding.results().isEmpty()) {
-            throw new BusinessException("City not found");
-        }
-
-        return geocoding.results().get(0);
-    }
-
     private City getOrCreateCity(GeocodingResult result) {
-        return cityRepository.findByName(result.name())
+        return cityRepository.findByNameAndApproximateLocation(result.name(), result.latitude(), result.longitude())
                 .orElseGet(() -> {
                     City newCity = City.builder()
                             .name(result.name())

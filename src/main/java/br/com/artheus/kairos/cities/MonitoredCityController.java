@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -58,12 +59,12 @@ public class MonitoredCityController {
     })
     public ResponseEntity<MonitoredCityResponse> addCityToMonitor(
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
-            @RequestBody AddCityRequest addCityRequest,
+            @RequestBody @Valid AddCityRequest addCityRequest,
             @Parameter(hidden = true) UriComponentsBuilder uriBuilder) {
 
         String userId = jwt.getSubject();
 
-        MonitoredCityResponse monitoredCityResponse = monitoredCityService.addCityToMonitor(addCityRequest.cityName(), userId);
+        MonitoredCityResponse monitoredCityResponse = monitoredCityService.addCityToMonitor(addCityRequest, userId);
 
         URI uri = uriBuilder
                 .path("/api/v1/monitored-cities/{id}")

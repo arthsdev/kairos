@@ -26,7 +26,7 @@ public class OpenMeteoClient {
             maxDelay = 200)
     public GeocodingResponse searchCity(String cityName) {
         return this.webClient.get()
-                .uri("https://geocoding-api.open-meteo.com/v1/search?name={cityName}&count=1&language=pt", cityName)
+                .uri("https://geocoding-api.open-meteo.com/v1/search?name={cityName}&count=5&language=pt", cityName)
                 .retrieve()
                 .bodyToMono(GeocodingResponse.class)
                 .block();
