@@ -1,11 +1,13 @@
 package br.com.artheus.kairos.occurrence;
 
 import br.com.artheus.kairos.anonymization.UserReferenceService;
+import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.enums.OccurrenceCategory;
 import br.com.artheus.kairos.shared.enums.OccurrenceSeverity;
 import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
+import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ForbiddenException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
@@ -51,6 +53,9 @@ class OccurrenceServiceTest {
     @Mock
     private UserReferenceService userReferenceService;
 
+    @Mock
+    private CityProvider cityProvider;
+
     @Captor
     private ArgumentCaptor<Occurrence> occurrenceCaptor;
 
@@ -74,6 +79,7 @@ class OccurrenceServiceTest {
             );
             String userId = "user-123";
 
+            when(cityProvider.isUserMonitoringCity(userId, "city-123")).thenReturn(true);
             when(securityService.isAdmin()).thenReturn(false);
             when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq(userId), eq(false)))
                     .thenReturn(dummyActions);
@@ -87,6 +93,24 @@ class OccurrenceServiceTest {
             assertThat(savedOccurrence.getCategory()).isEqualTo(OccurrenceCategory.LANDSLIDE);
             assertThat(savedOccurrence.getUserId()).isEqualTo(userId);
             assertThat(response).isNotNull();
+        }
+
+        @Test
+        @DisplayName("Should throw BusinessException when user is not monitoring the target city")
+        void shouldThrowExceptionWhenNotMonitoringCity() {
+            OccurrenceRequest request = new OccurrenceRequest(
+                    "Landslide on main road", "Heavy rain caused landslide", OccurrenceCategory.LANDSLIDE,
+                    OccurrenceSeverity.HIGH, -23.55, -46.63, "https://image.com/landslide.jpg", "city-999"
+            );
+            String userId = "user-123";
+
+            when(cityProvider.isUserMonitoringCity(userId, "city-999")).thenReturn(false);
+
+            assertThatThrownBy(() -> occurrenceService.createOccurrence(request, userId))
+                    .isInstanceOf(BusinessException.class)
+                    .hasMessage("You must be monitoring this city to report an occurrence in it");
+
+            verify(occurrenceRepository, never()).save(any(Occurrence.class));
         }
     }
 

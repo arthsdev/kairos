@@ -1,10 +1,12 @@
 package br.com.artheus.kairos.occurrence;
 
 import br.com.artheus.kairos.anonymization.UserReferenceService;
+import br.com.artheus.kairos.shared.contract.cities.CityProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceDataProvider;
 import br.com.artheus.kairos.shared.contract.occurrence.OccurrenceSummary;
 import br.com.artheus.kairos.shared.contract.security.SecurityService;
 import br.com.artheus.kairos.shared.enums.OccurrenceStatus;
+import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ForbiddenException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
@@ -24,9 +26,14 @@ public class OccurrenceService implements OccurrenceDataProvider {
     private final SecurityService securityService;
     private final OccurrenceActionsCalculator occurrenceActionsCalculator;
     private final UserReferenceService userReferenceService;
+    private final CityProvider cityProvider;
 
     @Transactional
     public OccurrenceResponse createOccurrence(OccurrenceRequest request, String userId) {
+
+        if (!cityProvider.isUserMonitoringCity(userId, request.cityId())) {
+            throw new BusinessException("You must be monitoring this city to report an occurrence in it");
+        }
 
         Occurrence occurrence = Occurrence.builder()
                 .title(request.title())
