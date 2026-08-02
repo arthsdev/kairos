@@ -7,4 +7,6 @@ public interface CityProvider {
     List<CityLocation> findActiveCities();
 
     CityLocation findCityById(String cityId);
+
+    boolean isUserMonitoringCity(String userId, String cityId);
 }

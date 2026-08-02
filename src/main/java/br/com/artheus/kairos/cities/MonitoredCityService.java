@@ -201,4 +201,9 @@ public class MonitoredCityService implements CityProvider {
         return cityRepository.findById(cityId)
                 .orElseThrow(() -> new ResourceNotFoundException("City not found with ID: " + cityId));
     }
+
+    @Override
+    public boolean isUserMonitoringCity(String userId, String cityId) {
+        return userCityRepository.findByUserIdAndCityIdAndActiveTrue(userId, cityId).isPresent();
+    }
 }
