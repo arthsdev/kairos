@@ -100,17 +100,18 @@ class MonitoredCityServiceTest {
 
         private final String userId = "user-123";
         private final String cityName = "Joinville";
+        private final AddCityRequest request = new AddCityRequest(cityName, -26.3, -48.8, "SC", "Brazil");
 
         @Test
         @DisplayName("Should throw ResourceNotFoundException when user plan is missing")
         void shouldThrowExceptionWhenPlanNotFound() {
             when(planRepository.findByUserId(userId)).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(cityName, userId))
+            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(request, userId))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessageContaining("Plan not found");
 
-            verifyNoInteractions(openMeteoClient, cityRepository);
+            verifyNoInteractions(cityRepository);
         }
 
         @Test
@@ -121,27 +122,9 @@ class MonitoredCityServiceTest {
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(5L);
             when(plan.hasReachedCityLimit(5L)).thenReturn(true);
 
-            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(cityName, userId))
+            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(request, userId))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("City limit reached for your plan");
-
-            verifyNoInteractions(openMeteoClient, cityRepository);
-        }
-
-        @Test
-        @DisplayName("Should throw BusinessException when API returns no geocoding results")
-        void shouldThrowExceptionWhenCityNotFoundExternally() {
-            Plan plan = mock(Plan.class);
-            when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
-            when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(2L);
-            when(plan.hasReachedCityLimit(2L)).thenReturn(false);
-
-            GeocodingResponse emptyResponse = new GeocodingResponse(Collections.emptyList());
-            when(openMeteoClient.searchCity(cityName)).thenReturn(emptyResponse);
-
-            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(cityName, userId))
-                    .isInstanceOf(BusinessException.class)
-                    .hasMessageContaining("City not found");
 
             verifyNoInteractions(cityRepository);
         }
@@ -151,18 +134,15 @@ class MonitoredCityServiceTest {
         void shouldThrowExceptionWhenAlreadyMonitoring() {
             Plan plan = mock(Plan.class);
             City existingCity = City.builder().id("city-99").name(cityName).build();
-            GeocodingResult result = new GeocodingResult(cityName, -26.3, -48.8, "SC", "Brazil");
 
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(1L);
             when(plan.hasReachedCityLimit(1L)).thenReturn(false);
-            when(openMeteoClient.searchCity(cityName)).thenReturn(new GeocodingResponse(List.of(result)));
-            when(cityRepository.findByName(cityName)).thenReturn(Optional.of(existingCity));
-
+            when(cityRepository.findByNameAndApproximateLocation(cityName, -26.3, -48.8)).thenReturn(Optional.of(existingCity));
             when(userCityRepository.findByUserIdAndCityIdAndActiveTrue(userId, "city-99"))
                     .thenReturn(Optional.of(new UserCity()));
 
-            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(cityName, userId))
+            assertThatThrownBy(() -> monitoredCityService.addCityToMonitor(request, userId))
                     .isInstanceOf(BusinessException.class)
                     .hasMessageContaining("You are already monitoring this city");
 
@@ -174,7 +154,6 @@ class MonitoredCityServiceTest {
         void shouldReuseExistingCityWhenFoundInDatabase() {
             Plan plan = mock(Plan.class);
             City dbCity = City.builder().id("city-exists").name(cityName).build();
-            GeocodingResult result = new GeocodingResult(cityName, -26.3, -48.8, "SC", "Brazil");
             UserCity savedUserCity = UserCity.builder()
                     .id("uc-123")
                     .userId(userId)
@@ -184,12 +163,11 @@ class MonitoredCityServiceTest {
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(0L);
             when(plan.hasReachedCityLimit(0L)).thenReturn(false);
-            when(openMeteoClient.searchCity(cityName)).thenReturn(new GeocodingResponse(List.of(result)));
-            when(cityRepository.findByName(cityName)).thenReturn(Optional.of(dbCity));
+            when(cityRepository.findByNameAndApproximateLocation(cityName, -26.3, -48.8)).thenReturn(Optional.of(dbCity));
             when(userCityRepository.findByUserIdAndCityIdAndActiveTrue(userId, "city-exists")).thenReturn(Optional.empty());
             when(userCityRepository.save(any(UserCity.class))).thenReturn(savedUserCity);
 
-            MonitoredCityResponse response = monitoredCityService.addCityToMonitor(cityName, userId);
+            MonitoredCityResponse response = monitoredCityService.addCityToMonitor(request, userId);
 
             assertThat(response).isNotNull();
             assertThat(response.id()).isEqualTo("city-exists");
@@ -201,7 +179,6 @@ class MonitoredCityServiceTest {
         @DisplayName("Should persist a new City entity when it does not exist locally")
         void shouldCreateNewCityAndAssociateWithUser() {
             Plan plan = mock(Plan.class);
-            GeocodingResult result = new GeocodingResult(cityName, -26.3, -48.8, "SC", "Brazil");
             City newCity = City.builder().id("city-new").name(cityName).build();
             UserCity savedUserCity = UserCity.builder()
                     .id("uc-789")
@@ -212,13 +189,12 @@ class MonitoredCityServiceTest {
             when(planRepository.findByUserId(userId)).thenReturn(Optional.of(plan));
             when(userCityRepository.countByUserIdAndActiveTrue(userId)).thenReturn(0L);
             when(plan.hasReachedCityLimit(0L)).thenReturn(false);
-            when(openMeteoClient.searchCity(cityName)).thenReturn(new GeocodingResponse(List.of(result)));
-            when(cityRepository.findByName(cityName)).thenReturn(Optional.empty());
+            when(cityRepository.findByNameAndApproximateLocation(cityName, -26.3, -48.8)).thenReturn(Optional.empty());
             when(cityRepository.save(any(City.class))).thenReturn(newCity);
             when(userCityRepository.findByUserIdAndCityIdAndActiveTrue(userId, "city-new")).thenReturn(Optional.empty());
             when(userCityRepository.save(any(UserCity.class))).thenReturn(savedUserCity);
 
-            MonitoredCityResponse response = monitoredCityService.addCityToMonitor(cityName, userId);
+            MonitoredCityResponse response = monitoredCityService.addCityToMonitor(request, userId);
 
             assertThat(response).isNotNull();
             assertThat(response.id()).isEqualTo("city-new");
