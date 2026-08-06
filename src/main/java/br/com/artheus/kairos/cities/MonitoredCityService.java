@@ -110,6 +110,12 @@ public class MonitoredCityService implements CityProvider {
                 .toList();
     }
 
+    /**
+     * Returns the distinct set of actively monitored cities, deduplicated
+     * by city ID. Multiple users may monitor the same physical city — the
+     * scheduler consuming this list should only fetch climate data and
+     * calculate risk once per city, not once per user-city association.
+     */
     @Override
     @Transactional(readOnly = true)
     public List<CityLocation> findActiveCities() {
@@ -120,27 +126,14 @@ public class MonitoredCityService implements CityProvider {
         }
 
         List<String> cityIds = userCities.stream()
-                .map(userCity -> userCity.getCity().getId())   // <- mesma mudança
+                .map(userCity -> userCity.getCity().getId())
+                .distinct()
                 .toList();
 
         List<City> cities = cityRepository.findAllById(cityIds);
 
-        Map<String, City> cityMap = cities.stream()
-                .collect(Collectors.toMap(City::getId, city -> city));
-
-        return userCities.stream()
-                .map(userCity -> {
-                    City city = cityMap.get(userCity.getCity().getId());
-
-                    if (city == null) {
-                        log.error("[DATA INCONSISTENCY] Active UserCity with ID {} points to a non-existent cityId {} in the database!",
-                                userCity.getId(), userCity.getCity().getId());
-                        return null;
-                    }
-
-                    return new CityLocation(city.getId(), city.getName(), city.getLatitude(), city.getLongitude());
-                })
-                .filter(Objects::nonNull)
+        return cities.stream()
+                .map(city -> new CityLocation(city.getId(), city.getName(), city.getLatitude(), city.getLongitude()))
                 .toList();
     }
 

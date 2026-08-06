@@ -150,6 +150,29 @@ class MonitoredCityServiceTest {
         }
 
         @Test
+        @DisplayName("Should deduplicate when multiple users monitor the same physical city")
+        void shouldDeduplicateWhenMultipleUsersMonitorSameCity() {
+            UserCity userOneCity = UserCity.builder()
+                    .id("uc-1")
+                    .city(City.builder().id("city-shared").build())
+                    .build();
+            UserCity userTwoCity = UserCity.builder()
+                    .id("uc-2")
+                    .city(City.builder().id("city-shared").build())
+                    .build();
+            City sharedCity = City.builder().id("city-shared").name("Itajubá").latitude(-22.4).longitude(-45.4).build();
+
+            when(userCityRepository.findAllByActiveTrue()).thenReturn(List.of(userOneCity, userTwoCity));
+            when(cityRepository.findAllById(List.of("city-shared"))).thenReturn(List.of(sharedCity));
+
+            List<CityLocation> result = monitoredCityService.findActiveCities();
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().id()).isEqualTo("city-shared");
+            verify(cityRepository, times(1)).findAllById(List.of("city-shared"));
+        }
+
+        @Test
         @DisplayName("Should reuse existing city entry and only save UserCity association")
         void shouldReuseExistingCityWhenFoundInDatabase() {
             Plan plan = mock(Plan.class);
