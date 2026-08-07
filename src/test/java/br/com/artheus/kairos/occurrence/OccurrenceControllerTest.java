@@ -304,4 +304,39 @@ class OccurrenceControllerTest {
                     .andExpect(status().isOk());
         }
     }
+
+    @Nested
+    @DisplayName("GET /api/v1/occurrences/map")
+    class GetMapOccurrencesTests {
+
+        @Test
+        @DisplayName("Should return 200 OK with list of map occurrences when authenticated")
+        void shouldReturnMapOccurrencesWhenAuthenticated() throws Exception {
+            // Given
+            MapOccurrenceDTO dto = new MapOccurrenceDTO(
+                    "occ-1",
+                    -23.55,
+                    -46.63,
+                    OccurrenceCategory.FLOOD,
+                    OccurrenceSeverity.MEDIUM,
+                    OccurrenceStatus.VERIFIED
+            );
+
+            when(occurrenceService.getMapOccurrences()).thenReturn(List.of(dto));
+
+            // When/Then
+            mockMvc.perform(get("/api/v1/occurrences/map")
+                            .with(jwt())
+                            .contentType(MediaType.APPLICATION_JSON))
+                    .andExpect(status().isOk())
+                    .andExpect(jsonPath("$[0].id").value("occ-1"))
+                    .andExpect(jsonPath("$[0].latitude").value(-23.55))
+                    .andExpect(jsonPath("$[0].longitude").value(-46.63))
+                    .andExpect(jsonPath("$[0].category").value("FLOOD"))
+                    .andExpect(jsonPath("$[0].severity").value("MEDIUM"))
+                    .andExpect(jsonPath("$[0].status").value("VERIFIED"));
+
+            verify(occurrenceService).getMapOccurrences();
+        }
+    }
 }

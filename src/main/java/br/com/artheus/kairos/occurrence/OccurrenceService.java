@@ -13,6 +13,8 @@ import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -197,6 +199,17 @@ public class OccurrenceService implements OccurrenceDataProvider {
         OccurrenceActions actions = occurrenceActionsCalculator.calculate(occurrence, currentUserId, isAdmin);
 
         return OccurrenceResponse.from(occurrence, actions);
+    }
+
+    @Transactional(readOnly = true)
+    public List<MapOccurrenceDTO> getMapOccurrences() {
+        boolean isAdmin = securityService.isAdmin();
+
+        List<OccurrenceStatus> allowedStatuses = isAdmin
+                ? List.of(OccurrenceStatus.PENDING, OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED)
+                : List.of(OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED);
+
+        return occurrenceRepository.findMapDataByStatusIn(allowedStatuses);
     }
 }
 
