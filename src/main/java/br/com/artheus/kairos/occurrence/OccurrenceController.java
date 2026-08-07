@@ -18,6 +18,8 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
+
 @RestController
 @RequestMapping("/api/v1/occurrences")
 @RequiredArgsConstructor
@@ -150,5 +152,19 @@ public class OccurrenceController {
     })
     public ResponseEntity<OccurrenceResponse> deleteOccurrence(@PathVariable String id) {
         return ResponseEntity.ok(occurrenceService.deleteOccurrence(id));
+    }
+
+    @GetMapping("/map")
+    @Operation(
+            summary = "Get occurrences for map view",
+            description = "Retrieves lightweight occurrence data (coordinates, category, severity, status) optimized for map rendering. Non-admin users receive only VERIFIED and RESOLVED occurrences, while users with ADMIN role also receive PENDING occurrences."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "Map occurrences retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token")
+    })
+    public ResponseEntity<List<MapOccurrenceDTO>> getMapOccurrences() {
+        List<MapOccurrenceDTO> mapData = occurrenceService.getMapOccurrences();
+        return ResponseEntity.ok(mapData);
     }
 }

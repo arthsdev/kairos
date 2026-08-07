@@ -11,6 +11,9 @@ import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ForbiddenException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -455,6 +458,44 @@ class OccurrenceServiceTest {
             verify(occurrenceRepository).save(occurrence);
             assertThat(occurrence.isDeleted()).isTrue();
             assertThat(response.actions()).isEqualTo(dummyActions);
+        }
+    }
+
+    @Nested
+    @DisplayName("Tests for getMapOccurrences()")
+    class GetMapOccurrences {
+
+        @Test
+        @DisplayName("Should return PENDING, VERIFIED, and RESOLVED occurrences when user has ROLE_ADMIN")
+        void shouldReturnAllStatusForAdmin() {
+            MapOccurrenceDTO dto1 = new MapOccurrenceDTO("occ-1", -23.55, -46.63, OccurrenceCategory.LANDSLIDE, OccurrenceSeverity.HIGH, OccurrenceStatus.PENDING);
+            MapOccurrenceDTO dto2 = new MapOccurrenceDTO("occ-2", -23.56, -46.64, OccurrenceCategory.FLOOD, OccurrenceSeverity.MEDIUM, OccurrenceStatus.VERIFIED);
+
+            when(securityService.isAdmin()).thenReturn(true);
+            List<OccurrenceStatus> expectedStatuses = List.of(OccurrenceStatus.PENDING, OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED);
+            when(occurrenceRepository.findMapDataByStatusIn(expectedStatuses)).thenReturn(List.of(dto1, dto2));
+
+            List<MapOccurrenceDTO> result = occurrenceService.getMapOccurrences();
+
+            assertThat(result).hasSize(2);
+            assertThat(result).containsExactly(dto1, dto2);
+            verify(occurrenceRepository).findMapDataByStatusIn(expectedStatuses);
+        }
+
+        @Test
+        @DisplayName("Should return only VERIFIED and RESOLVED occurrences when user does not have ROLE_ADMIN")
+        void shouldReturnOnlyVerifiedAndResolvedForNonAdmin() {
+            MapOccurrenceDTO dto = new MapOccurrenceDTO("occ-2", -23.56, -46.64, OccurrenceCategory.FLOOD, OccurrenceSeverity.MEDIUM, OccurrenceStatus.VERIFIED);
+
+            when(securityService.isAdmin()).thenReturn(false);
+            List<OccurrenceStatus> expectedStatuses = List.of(OccurrenceStatus.VERIFIED, OccurrenceStatus.RESOLVED);
+            when(occurrenceRepository.findMapDataByStatusIn(expectedStatuses)).thenReturn(List.of(dto));
+
+            List<MapOccurrenceDTO> result = occurrenceService.getMapOccurrences();
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().status()).isEqualTo(OccurrenceStatus.VERIFIED);
+            verify(occurrenceRepository).findMapDataByStatusIn(expectedStatuses);
         }
     }
 }
