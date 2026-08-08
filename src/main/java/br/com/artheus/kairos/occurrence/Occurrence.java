@@ -122,6 +122,18 @@ public class Occurrence {
         }
     }
 
+    public void changeLocation(Double latitude, Double longitude) {
+        this.ensureNotDeleted();
+        this.ensureNotFinalizedForUpdate();
+
+        if (latitude != null) {
+            this.latitude = latitude;
+        }
+        if (longitude != null) {
+            this.longitude = longitude;
+        }
+    }
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

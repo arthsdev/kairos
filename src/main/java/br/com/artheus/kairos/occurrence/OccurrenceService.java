@@ -13,8 +13,6 @@ import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
 import lombok.RequiredArgsConstructor;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -132,6 +130,8 @@ public class OccurrenceService implements OccurrenceDataProvider {
 
         if (request.title() != null) occurrence.changeTitle(request.title());
         if (request.description() != null) occurrence.changeDescription(request.description());
+
+        occurrence.changeLocation(request.latitude(), request.longitude());
 
         occurrenceRepository.save(occurrence);
 

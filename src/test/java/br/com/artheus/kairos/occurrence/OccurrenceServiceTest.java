@@ -11,9 +11,6 @@ import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ForbiddenException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.shared.pagination.PaginatedResponse;
-import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
-import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -50,14 +47,14 @@ class OccurrenceServiceTest {
     @Mock
     private OccurrenceActionsCalculator occurrenceActionsCalculator;
 
-    @InjectMocks
-    private OccurrenceService occurrenceService;
-
     @Mock
     private UserReferenceService userReferenceService;
 
     @Mock
     private CityProvider cityProvider;
+
+    @InjectMocks
+    private OccurrenceService occurrenceService;
 
     @Captor
     private ArgumentCaptor<Occurrence> occurrenceCaptor;
@@ -125,7 +122,7 @@ class OccurrenceServiceTest {
         @DisplayName("Should return paginated occurrences filtered by status with admin privileges")
         void shouldReturnPaginatedOccurrencesWithStatusAsAdmin() {
             Pageable pageable = PageRequest.of(0, 10);
-            Occurrence occurrence = Occurrence.builder().status(OccurrenceStatus.VERIFIED).build();
+            Occurrence occurrence = Occurrence.builder().userId("user-123").status(OccurrenceStatus.VERIFIED).build();
             Page<Occurrence> page = new PageImpl<>(List.of(occurrence));
 
             when(securityService.getCurrentUserId()).thenReturn("admin-123");
@@ -134,7 +131,7 @@ class OccurrenceServiceTest {
                     .thenReturn(page);
             when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
-            when(userReferenceService.getDisplayId(any()))
+            when(userReferenceService.getDisplayId("user-123"))
                     .thenReturn("#12345");
 
             PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(OccurrenceStatus.VERIFIED, pageable);
@@ -148,7 +145,7 @@ class OccurrenceServiceTest {
         @DisplayName("Should return all paginated occurrences when status is null with admin privileges")
         void shouldReturnAllPaginatedOccurrencesWhenStatusIsNullAsAdmin() {
             Pageable pageable = PageRequest.of(0, 10);
-            Occurrence occurrence = Occurrence.builder().status(OccurrenceStatus.PENDING).build();
+            Occurrence occurrence = Occurrence.builder().userId("user-123").status(OccurrenceStatus.PENDING).build();
             Page<Occurrence> page = new PageImpl<>(List.of(occurrence));
 
             when(securityService.getCurrentUserId()).thenReturn("admin-123");
@@ -157,7 +154,7 @@ class OccurrenceServiceTest {
                     .thenReturn(page);
             when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
-            when(userReferenceService.getDisplayId(any()))
+            when(userReferenceService.getDisplayId("user-123"))
                     .thenReturn("#12345");
 
             PaginatedResponse<OccurrenceResponse> response = occurrenceService.getOccurrences(null, pageable);
@@ -241,7 +238,7 @@ class OccurrenceServiceTest {
         @DisplayName("Should update occurrence successfully when user is the owner")
         void shouldUpdateSuccessfullyAsOwner() {
             String id = "occ-123";
-            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("New Title", "New Desc");
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("New Title", "New Desc", -23.55, -46.63);
             Occurrence occurrence = Occurrence.builder()
                     .id(id)
                     .userId("user-123")
@@ -251,7 +248,7 @@ class OccurrenceServiceTest {
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
             when(securityService.getCurrentUserId()).thenReturn("user-123");
             when(securityService.isAdmin()).thenReturn(false);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("user-123"), eq(false)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.updateOccurrence(id, request);
@@ -259,6 +256,8 @@ class OccurrenceServiceTest {
             verify(occurrenceRepository).save(occurrence);
             assertThat(occurrence.getTitle()).isEqualTo("New Title");
             assertThat(occurrence.getDescription()).isEqualTo("New Desc");
+            assertThat(occurrence.getLatitude()).isEqualTo(-23.55);
+            assertThat(occurrence.getLongitude()).isEqualTo(-46.63);
             assertThat(response.actions()).isEqualTo(dummyActions);
         }
 
@@ -267,7 +266,9 @@ class OccurrenceServiceTest {
         void shouldThrowNotFound() {
             when(occurrenceRepository.findById("invalid")).thenReturn(Optional.empty());
 
-            assertThatThrownBy(() -> occurrenceService.updateOccurrence("invalid", new UpdateOccurrenceRequest("T", "D")))
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("T", "D", 0.0, 0.0);
+
+            assertThatThrownBy(() -> occurrenceService.updateOccurrence("invalid", request))
                     .isInstanceOf(ResourceNotFoundException.class)
                     .hasMessage("Occurrence not found");
         }
@@ -282,7 +283,9 @@ class OccurrenceServiceTest {
             when(securityService.getCurrentUserId()).thenReturn("stranger-user");
             when(securityService.isAdmin()).thenReturn(false);
 
-            assertThatThrownBy(() -> occurrenceService.updateOccurrence(id, new UpdateOccurrenceRequest("T", "D")))
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("T", "D", 0.0, 0.0);
+
+            assertThatThrownBy(() -> occurrenceService.updateOccurrence(id, request))
                     .isInstanceOf(ForbiddenException.class)
                     .hasMessage("You can't update the occurrence");
         }
@@ -291,7 +294,7 @@ class OccurrenceServiceTest {
         @DisplayName("Should update occurrence successfully when user is admin but not the owner")
         void shouldUpdateSuccessfullyAsAdmin() {
             String id = "occ-123";
-            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("New Title", "New Desc");
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest("New Title", "New Desc", -23.55, -46.63);
 
             Occurrence occurrence = Occurrence.builder()
                     .id(id)
@@ -302,7 +305,7 @@ class OccurrenceServiceTest {
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
             when(securityService.getCurrentUserId()).thenReturn("admin-user");
             when(securityService.isAdmin()).thenReturn(true);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-user"), eq(true)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.updateOccurrence(id, request);
@@ -311,6 +314,70 @@ class OccurrenceServiceTest {
             assertThat(occurrence.getTitle()).isEqualTo("New Title");
             assertThat(occurrence.getDescription()).isEqualTo("New Desc");
             assertThat(response.actions()).isEqualTo(dummyActions);
+        }
+
+        @Test
+        @DisplayName("Should update location coordinates successfully")
+        void shouldUpdateLocationSuccessfully() {
+            String id = "occ-123";
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest(null, null, -23.5555, -46.6333);
+
+            Occurrence occurrence = Occurrence.builder()
+                    .id(id)
+                    .userId("user-123")
+                    .latitude(-20.0000)
+                    .longitude(-40.0000)
+                    .status(OccurrenceStatus.PENDING)
+                    .build();
+
+            when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("user-123");
+            when(securityService.isAdmin()).thenReturn(false);
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("user-123"), eq(false)))
+                    .thenReturn(dummyActions);
+
+            occurrenceService.updateOccurrence(id, request);
+
+            verify(occurrenceRepository).save(occurrenceCaptor.capture());
+            Occurrence saved = occurrenceCaptor.getValue();
+
+            assertThat(saved.getLatitude()).isEqualTo(-23.5555);
+            assertThat(saved.getLongitude()).isEqualTo(-46.6333);
+        }
+
+        @Test
+        @DisplayName("Should update title and description without changing existing coordinates when lat/long are null")
+        void shouldUpdateTitleAndDescriptionWithNullCoordinates() {
+            String id = "occ-123";
+            UpdateOccurrenceRequest request = new UpdateOccurrenceRequest(
+                    "New Title With More Than Twenty Characters",
+                    "New Description",
+                    null,
+                    null
+            );
+            Occurrence occurrence = Occurrence.builder()
+                    .id(id)
+                    .userId("user-123")
+                    .latitude(-23.55)
+                    .longitude(-46.63)
+                    .status(OccurrenceStatus.PENDING)
+                    .build();
+
+            when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("user-123");
+            when(securityService.isAdmin()).thenReturn(false);
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("user-123"), eq(false)))
+                    .thenReturn(dummyActions);
+
+            occurrenceService.updateOccurrence(id, request);
+
+            verify(occurrenceRepository).save(occurrenceCaptor.capture());
+            Occurrence saved = occurrenceCaptor.getValue();
+
+            assertThat(saved.getTitle()).isEqualTo("New Title With More Than Twenty Characters");
+            assertThat(saved.getDescription()).isEqualTo("New Description");
+            assertThat(saved.getLatitude()).isEqualTo(-23.55);
+            assertThat(saved.getLongitude()).isEqualTo(-46.63);
         }
     }
 
@@ -328,8 +395,9 @@ class OccurrenceServiceTest {
                     .build();
 
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("admin-123");
             when(securityService.isAdmin()).thenReturn(true);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.verifyOccurrence(id);
@@ -346,6 +414,7 @@ class OccurrenceServiceTest {
             Occurrence occurrence = Occurrence.builder().id(id).status(OccurrenceStatus.PENDING).build();
 
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("user-123");
             when(securityService.isAdmin()).thenReturn(false);
 
             assertThatThrownBy(() -> occurrenceService.verifyOccurrence(id))
@@ -368,8 +437,9 @@ class OccurrenceServiceTest {
                     .build();
 
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("admin-123");
             when(securityService.isAdmin()).thenReturn(true);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-123"), eq(true)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.resolveOccurrence(id);
@@ -386,6 +456,7 @@ class OccurrenceServiceTest {
             Occurrence occurrence = Occurrence.builder().id(id).status(OccurrenceStatus.VERIFIED).build();
 
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
+            when(securityService.getCurrentUserId()).thenReturn("user-123");
             when(securityService.isAdmin()).thenReturn(false);
 
             assertThatThrownBy(() -> occurrenceService.resolveOccurrence(id))
@@ -411,7 +482,7 @@ class OccurrenceServiceTest {
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
             when(securityService.getCurrentUserId()).thenReturn("user-123");
             when(securityService.isAdmin()).thenReturn(false);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("user-123"), eq(false)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.deleteOccurrence(id);
@@ -450,7 +521,7 @@ class OccurrenceServiceTest {
             when(occurrenceRepository.findById(id)).thenReturn(Optional.of(occurrence));
             when(securityService.getCurrentUserId()).thenReturn("admin-user");
             when(securityService.isAdmin()).thenReturn(true);
-            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), any(), anyBoolean()))
+            when(occurrenceActionsCalculator.calculate(any(Occurrence.class), eq("admin-user"), eq(true)))
                     .thenReturn(dummyActions);
 
             OccurrenceResponse response = occurrenceService.deleteOccurrence(id);
