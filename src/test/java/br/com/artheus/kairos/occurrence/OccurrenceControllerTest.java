@@ -8,12 +8,12 @@ import io.github.bucket4j.ConsumptionProbe;
 import io.github.bucket4j.distributed.BucketProxy;
 import io.github.bucket4j.distributed.proxy.ProxyManager;
 import io.github.bucket4j.distributed.proxy.RemoteBucketBuilder;
-import tools.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
 import org.mockito.Answers;
+import org.mockito.ArgumentCaptor;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.boot.webmvc.test.autoconfigure.WebMvcTest;
@@ -22,14 +22,17 @@ import org.springframework.context.annotation.Import;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.MediaType;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
+import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import tools.jackson.databind.ObjectMapper;
 
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.function.Supplier;
 
+import static org.assertj.core.api.AssertionsForClassTypes.assertThat;
 import static org.mockito.ArgumentMatchers.*;
 import static org.mockito.Mockito.*;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
@@ -63,9 +66,9 @@ class OccurrenceControllerTest {
     static class TestSecurityConfig {
 
         @Bean
-        SecurityFilterChain filterChain(HttpSecurity http) throws Exception {
+        SecurityFilterChain filterChain(HttpSecurity http) {
             http
-                    .csrf(csrf -> csrf.disable())
+                    .csrf(AbstractHttpConfigurer::disable)
                     .authorizeHttpRequests(auth -> auth.anyRequest().permitAll());
 
             return http.build();
@@ -240,7 +243,12 @@ class OccurrenceControllerTest {
         @Test
         @DisplayName("Should update occurrence partially and return 200 OK")
         void shouldUpdateOccurrence() throws Exception {
-            UpdateOccurrenceRequest updateRequest = new UpdateOccurrenceRequest("New Title Update More Than Twenty", "New Desc");
+            UpdateOccurrenceRequest updateRequest = new UpdateOccurrenceRequest(
+                    "New Title Update More Than Twenty",
+                    "New Desc",
+                    -23.55,
+                    -46.63
+            );
             OccurrenceResponse response = createMockResponse();
 
             when(occurrenceService.updateOccurrence(eq("occ-123"), any(UpdateOccurrenceRequest.class)))
@@ -251,6 +259,51 @@ class OccurrenceControllerTest {
                             .contentType(MediaType.APPLICATION_JSON)
                             .content(objectMapper.writeValueAsString(updateRequest)))
                     .andExpect(status().isOk());
+        }
+
+        @Test
+        @DisplayName("Should pass new latitude and longitude from request body to service layer")
+        void shouldPassLocationToServiceOnUpdate() throws Exception {
+            UpdateOccurrenceRequest updateRequest = new UpdateOccurrenceRequest(
+                    "This is a valid updated title with more than twenty characters",
+                    "New Desc",
+                    -23.5555,
+                    -46.6333
+            );
+            OccurrenceResponse response = createMockResponse();
+
+            ArgumentCaptor<UpdateOccurrenceRequest> requestCaptor = ArgumentCaptor.forClass(UpdateOccurrenceRequest.class);
+
+            when(occurrenceService.updateOccurrence(eq("occ-123"), requestCaptor.capture()))
+                    .thenReturn(response);
+
+            mockMvc.perform(patch("/api/v1/occurrences/occ-123")
+                            .with(jwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(updateRequest)))
+                    .andExpect(status().isOk());
+
+            UpdateOccurrenceRequest capturedRequest = requestCaptor.getValue();
+            assertThat(capturedRequest.latitude()).isEqualTo(-23.5555);
+            assertThat(capturedRequest.longitude()).isEqualTo(-46.6333);
+        }
+
+        @Test
+        @DisplayName("Should return 400 Bad Request when longitude is out of bounds (< -180.0)")
+        void shouldReturn400WhenLongitudeIsOutOfBounds() throws Exception {
+            UpdateOccurrenceRequest invalidRequest = new UpdateOccurrenceRequest(
+                    "This is a valid title with more than twenty characters",
+                    "Valid description",
+                    -23.5555,
+                    -180.01
+            );
+
+            mockMvc.perform(patch("/api/v1/occurrences/occ-123")
+                            .with(jwt())
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content(objectMapper.writeValueAsString(invalidRequest)))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.message").exists());
         }
     }
 
@@ -312,7 +365,6 @@ class OccurrenceControllerTest {
         @Test
         @DisplayName("Should return 200 OK with list of map occurrences when authenticated")
         void shouldReturnMapOccurrencesWhenAuthenticated() throws Exception {
-            // Given
             MapOccurrenceDTO dto = new MapOccurrenceDTO(
                     "occ-1",
                     -23.55,
@@ -324,7 +376,6 @@ class OccurrenceControllerTest {
 
             when(occurrenceService.getMapOccurrences()).thenReturn(List.of(dto));
 
-            // When/Then
             mockMvc.perform(get("/api/v1/occurrences/map")
                             .with(jwt())
                             .contentType(MediaType.APPLICATION_JSON))
