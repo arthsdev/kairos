@@ -60,7 +60,7 @@ public class OccurrenceController {
     public ResponseEntity<PaginatedResponse<OccurrenceResponse>> listOccurrences(
             @Parameter(description = "Optional status to filter occurrences")
             @RequestParam(required = false) OccurrenceStatus status,
-            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         return ResponseEntity.ok(occurrenceService.getOccurrences(status, pageable));
     }
@@ -78,7 +78,7 @@ public class OccurrenceController {
             @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Optional status to filter occurrences")
             @RequestParam(required = false) OccurrenceStatus status,
-            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.ASC) Pageable pageable) {
+            @ParameterObject @PageableDefault(page = 0, size = 10, sort = "createdAt", direction = Sort.Direction.DESC) Pageable pageable) {
 
         String userId = jwt.getSubject();
         return ResponseEntity.ok(occurrenceService.getMyOccurrences(userId, status, pageable));
