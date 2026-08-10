@@ -4,6 +4,8 @@ import br.com.artheus.kairos.plan.Plan;
 import br.com.artheus.kairos.plan.PlanRepository;
 import br.com.artheus.kairos.shared.contract.cities.CityLocation;
 import br.com.artheus.kairos.shared.contract.cities.CityProvider;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ExternalServiceException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
@@ -31,7 +33,7 @@ public class MonitoredCityService implements CityProvider {
     private final UserCityRepository userCityRepository;
     private final CityRepository cityRepository;
     private final OpenMeteoClient openMeteoClient;
-
+    private final ClimateDataProvider  climateDataProvider;
     /**
      * Fetches a city from the external geocoding API (Open-Meteo).
      * The  OpenMeteoClient already applies automatic retries @Retryable
@@ -107,6 +109,25 @@ public class MonitoredCityService implements CityProvider {
                     return MonitoredCityResponse.from(city, userCity);
                 })
                 .filter(Objects::nonNull) // Removes mappings that failed
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<MonitoredCityWithClimateResponse> listMyCitiesWithClimate(String userId) {
+        List<MonitoredCityResponse> cities = listMyCities(userId).stream()
+                .filter(MonitoredCityResponse::active)
+                .toList();
+
+        return cities.stream()
+                .map(city -> {
+                    ClimateDataSummary climate = null;
+                    try {
+                        climate = climateDataProvider.findLatestByCity(city.id());
+                    } catch (ResourceNotFoundException ex) {
+                        log.info("No climate data yet for city {} ({})", city.id(), city.name());
+                    }
+                    return MonitoredCityWithClimateResponse.from(city, climate);
+                })
                 .toList();
     }
 
