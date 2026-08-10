@@ -106,4 +106,19 @@ public class MonitoredCityController {
             @PathVariable String id) {
         return ResponseEntity.ok(climateDataProvider.findLatestByCity(id));
     }
+
+    @GetMapping("/climate")
+    @Operation(
+            summary = "List monitored cities with their latest climate data",
+            description = "Retrieves all actively monitored cities for the authenticated user, each enriched with the most recent climate data summary when available. Cities without collected climate data yet return a null climate field."
+    )
+    @ApiResponses(value = {
+            @ApiResponse(responseCode = "200", description = "List retrieved successfully"),
+            @ApiResponse(responseCode = "401", description = "User not authenticated or invalid token")
+    })
+    public ResponseEntity<List<MonitoredCityWithClimateResponse>> listMyCitiesWithClimate(
+            @Parameter(hidden = true) @AuthenticationPrincipal Jwt jwt) {
+        String userId = jwt.getSubject();
+        return ResponseEntity.ok(monitoredCityService.listMyCitiesWithClimate(userId));
+    }
 }

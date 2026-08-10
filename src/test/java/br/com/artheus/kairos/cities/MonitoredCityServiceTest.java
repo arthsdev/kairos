@@ -3,11 +3,13 @@ package br.com.artheus.kairos.cities;
 import br.com.artheus.kairos.plan.Plan;
 import br.com.artheus.kairos.plan.PlanRepository;
 import br.com.artheus.kairos.shared.contract.cities.CityLocation;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataProvider;
+import br.com.artheus.kairos.shared.contract.climate.ClimateDataSummary;
+import br.com.artheus.kairos.shared.enums.RiskLevel;
 import br.com.artheus.kairos.shared.exception.BusinessException;
 import br.com.artheus.kairos.shared.exception.ExternalServiceException;
 import br.com.artheus.kairos.shared.exception.ResourceNotFoundException;
 import br.com.artheus.kairos.weather.GeocodingResponse;
-import br.com.artheus.kairos.weather.GeocodingResult;
 import br.com.artheus.kairos.weather.OpenMeteoClient;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Nested;
@@ -19,6 +21,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.http.HttpHeaders;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 
+import java.time.LocalDateTime;
 import java.util.Collections;
 import java.util.List;
 import java.util.Optional;
@@ -43,6 +46,9 @@ class MonitoredCityServiceTest {
 
     @Mock
     private OpenMeteoClient openMeteoClient;
+
+    @Mock
+    private ClimateDataProvider climateDataProvider;
 
     @InjectMocks
     private MonitoredCityService monitoredCityService;
@@ -291,6 +297,115 @@ class MonitoredCityServiceTest {
             List<MonitoredCityResponse> result = monitoredCityService.listMyCities(userId);
 
             assertThat(result).isEmpty();
+        }
+    }
+
+    @Nested
+    @DisplayName("Tests for listMyCitiesWithClimate")
+    class ListMyCitiesWithClimateTests {
+
+        @Test
+        @DisplayName("Should return active cities with climate data and ignore inactive ones")
+        void shouldReturnActiveCitiesWithClimateData() {
+            String userId = "user-1";
+
+            UserCity activeUc1 = UserCity.builder()
+                    .id("uc-1")
+                    .userId(userId)
+                    .active(true)
+                    .city(City.builder().id("city-1").name("Joinville").state("SC").latitude(-26.3).longitude(-48.8).country("Brazil").build())
+                    .build();
+
+            UserCity activeUc2 = UserCity.builder()
+                    .id("uc-2")
+                    .userId(userId)
+                    .active(true)
+                    .city(City.builder().id("city-2").name("Blumenau").state("SC").latitude(-26.9).longitude(-49.0).country("Brazil").build())
+                    .build();
+
+            UserCity inactiveUc = UserCity.builder()
+                    .id("uc-3")
+                    .userId(userId)
+                    .active(false)
+                    .city(City.builder().id("city-3").name("Florianópolis").state("SC").latitude(-27.5).longitude(-48.5).country("Brazil").build())
+                    .build();
+
+            City city1 = City.builder().id("city-1").name("Joinville").state("SC").latitude(-26.3).longitude(-48.8).country("Brazil").build();
+            City city2 = City.builder().id("city-2").name("Blumenau").state("SC").latitude(-26.9).longitude(-49.0).country("Brazil").build();
+            City city3 = City.builder().id("city-3").name("Florianópolis").state("SC").latitude(-27.5).longitude(-48.5).country("Brazil").build();
+
+            when(userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(List.of(activeUc1, activeUc2, inactiveUc));
+            when(cityRepository.findAllById(anyList()))
+                    .thenReturn(List.of(city1, city2, city3));
+
+            ClimateDataSummary summary1 = new ClimateDataSummary(25.5, 70.0, 10.0, 15.0, RiskLevel.LOW, LocalDateTime.now());
+            ClimateDataSummary summary2 = new ClimateDataSummary(28.0, 65.0, 0.0, 5.0, RiskLevel.LOW, LocalDateTime.now());
+
+            when(climateDataProvider.findLatestByCity("city-1")).thenReturn(summary1);
+            when(climateDataProvider.findLatestByCity("city-2")).thenReturn(summary2);
+
+            List<MonitoredCityWithClimateResponse> result = monitoredCityService.listMyCitiesWithClimate(userId);
+
+            assertThat(result).hasSize(2);
+
+            assertThat(result.getFirst().id()).isEqualTo("city-1");
+            assertThat(result.getFirst().name()).isEqualTo("Joinville");
+            assertThat(result.getFirst().active()).isTrue();
+            assertThat(result.getFirst().climate()).isEqualTo(summary1);
+
+            assertThat(result.get(1).id()).isEqualTo("city-2");
+            assertThat(result.get(1).name()).isEqualTo("Blumenau");
+            assertThat(result.get(1).active()).isTrue();
+            assertThat(result.get(1).climate()).isEqualTo(summary2);
+
+            verify(climateDataProvider, times(1)).findLatestByCity("city-1");
+            verify(climateDataProvider, times(1)).findLatestByCity("city-2");
+            verify(climateDataProvider, never()).findLatestByCity("city-3");
+        }
+
+        @Test
+        @DisplayName("Should handle ResourceNotFoundException gracefully and return city with null climate")
+        void shouldHandleResourceNotFoundExceptionGracefully() {
+            String userId = "user-1";
+
+            UserCity activeUc = UserCity.builder()
+                    .id("uc-1")
+                    .userId(userId)
+                    .active(true)
+                    .city(City.builder().id("city-1").name("Joinville").state("SC").latitude(-26.3).longitude(-48.8).country("Brazil").build())
+                    .build();
+
+            City city1 = City.builder().id("city-1").name("Joinville").state("SC").latitude(-26.3).longitude(-48.8).country("Brazil").build();
+
+            when(userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(List.of(activeUc));
+            when(cityRepository.findAllById(anyList()))
+                    .thenReturn(List.of(city1));
+
+            when(climateDataProvider.findLatestByCity("city-1"))
+                    .thenThrow(new ResourceNotFoundException("No climate data found"));
+
+            List<MonitoredCityWithClimateResponse> result = monitoredCityService.listMyCitiesWithClimate(userId);
+
+            assertThat(result).hasSize(1);
+            assertThat(result.getFirst().id()).isEqualTo("city-1");
+            assertThat(result.getFirst().climate()).isNull();
+
+            verify(climateDataProvider, times(1)).findLatestByCity("city-1");
+        }
+
+        @Test
+        @DisplayName("Should return empty list when user is not monitoring any city")
+        void shouldReturnEmptyListWhenUserHasNoCities() {
+            String userId = "user-empty";
+            when(userCityRepository.findAllByUserIdOrderByCreatedAtDesc(userId))
+                    .thenReturn(Collections.emptyList());
+
+            List<MonitoredCityWithClimateResponse> result = monitoredCityService.listMyCitiesWithClimate(userId);
+
+            assertThat(result).isEmpty();
+            verifyNoInteractions(climateDataProvider);
         }
     }
 
