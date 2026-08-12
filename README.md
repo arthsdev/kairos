@@ -26,43 +26,33 @@
 
 O sistema resolve um problema real: comunidades expostas a eventos climáticos extremos (enchentes, deslizamentos) precisam de um jeito rápido de reportar incidentes e receber alertas preventivos baseados em dados objetivos — não só na percepção individual de quem reporta.
 
-O diferencial do projeto não é "mais um CRUD com clima": é o cruzamento de duas fontes de dados (denúncias da comunidade + dados climáticos de uma API externa) através de um motor de risco (`risk-engine`) que calcula um nível de risco ponderado e explicável, com um modelo de acesso por assinatura (trial → free/premium) processado através de uma integração de pagamento real via Stripe.
+O diferencial do projeto não é "mais um CRUD com clima": é o cruzamento de duas fontes de dados (denúncias da comunidade + dados climáticos de uma API externa) através de um motor de risco (`risk-engine`) que calcula um nível de risco ponderado e explicável, com um modelo de acesso por assinatura (trial → free/premium) processado através de uma integração de pagamento real via Stripe, e uma interface web própria (React + Leaflet) para visualização em mapa e moderação.
 
 ## Arquitetura
 
+```mermaid
+flowchart TD
+    A[Usuário / App] -->|REST, JWT via Keycloak| B[Controllers]
+    B --> C[Services]
 ```
-                    ┌─────────────────┐
-                    │   Usuário/App    │
-                    └────────┬─────────┘
-                             │ REST (JWT via Keycloak)
-                             ▼
-                    ┌─────────────────┐
-                    │   Controllers    │
-                    └────────┬─────────┘
-                             ▼
-   ┌──────────────────────────────────────────────┐
-   │                   Services                     │
-   └──┬──────────┬──────────┬───────────┬──────────┘
-      │          │          │           │
-      ▼          ▼          ▼           ▼
- ┌─────────┐ ┌────────┐ ┌───────┐ ┌───────────┐
- │Occurrence│ │Climate │ │ Plan  │ │  Payment   │
- │  Module  │ │ Module │ │Module │ │  (Stripe)  │
- └────┬─────┘ └───┬────┘ └───┬───┘ └─────┬─────┘
-      │           │          │           │
-      │           │ (scheduler consulta  │ webhook confirma
-      │           │  API climática)      │ pagamento/eventos
-      └─────┬─────┘          │           │
-            ▼                │           ▼
-    ┌───────────────┐        │   ┌──────────────────┐
-    │  Risk Engine   │        │   │ upgradeToPremium │
-    │ (RiskCalculator)│       │   │ downgradeToFree  │
-    └───────┬───────┘        │   └──────────────────┘
-            ▼                │
-    ┌───────────────┐        │
-    │ Notification   │◄───────┘
-    │ (Discord webhook)│
-    └───────────────┘
+
+Os `Services` se dividem em quatro módulos principais, cada um com seu próprio fluxo — detalhados abaixo em dois diagramas separados, já que risco e assinatura são fluxos independentes entre si.
+
+**Fluxo de risco:**
+
+```mermaid
+flowchart TD
+    A[Occurrence Module] --> C[Risk Engine<br/>RiskCalculator]
+    B[Climate Module] -->|scheduler consulta<br/>API climática| C
+    C --> D[Notification<br/>Discord webhook]
+```
+
+**Fluxo de assinatura:**
+
+```mermaid
+flowchart TD
+    A[Plan Module] --> C{upgradeToPremium<br/>downgradeToFree}
+    B[Payment / Stripe] -->|webhook confirma<br/>pagamento/eventos| C
 ```
 
 **Fluxo principal (risco):**
@@ -100,12 +90,12 @@ Organização em **pacotes por domínio** (domain-first), não por camada técni
 
 ```
 br.com.artheus.kairos
-├── occurrence     → denúncias ambientais (CRUD, verificação, resolução)
+├── occurrence     → denúncias ambientais (CRUD, verificação, resolução, mapa)
 ├── climate        → integração com API externa de clima
 ├── risk           → RiskCalculator (motor de cálculo de risco) + orquestração + mensageria
 ├── plan           → planos de assinatura (trial/free/premium), ciclo de vida via webhooks
 ├── payment        → integração Stripe (checkout, parsing de eventos de webhook)
-├── cities         → cidades monitoradas, geocoding externo (Open-Meteo)
+├── cities         → cidades monitoradas, geocoding externo (Open-Meteo), resumo climático
 ├── notification   → disparo de alertas via Discord webhook (canal único, reutilizável)
 ├── anonymization  → pseudonimização reversível de denunciantes (UserReference), para exibição anônima em contexto de moderação
 └── shared
@@ -125,6 +115,8 @@ O `shared/contract` existe especificamente para permitir que módulos se comuniq
 - **Controle de acesso refinado**: usuários comuns só editam/removem suas próprias ocorrências; ADMIN tem bypass de ownership, mas **não** bypassa regras de estado (uma ocorrência finalizada continua bloqueada mesmo para ADMIN)
 - Distinção explícita entre `ForbiddenException` (403 — falha de autorização) e `BusinessException` (422 — violação de regra de negócio)
 - Endpoints `POST /{id}/verify` e `POST /{id}/resolve`, restritos a ADMIN, com defesa em profundidade (bloqueio tanto no `SecurityConfig` quanto na camada de service)
+- `PATCH /{id}` aceita atualização parcial de título, descrição e localização (`latitude`/`longitude`) — a mesma entidade se protege contra alteração em ocorrências já finalizadas ou removidas, e cada campo só é alterado se enviado (omitir um campo não o apaga)
+- Endpoint dedicado e leve (`GET /occurrences/map`) para alimentar a visualização em mapa do frontend — retorna apenas coordenadas, categoria, severidade e status via projeção direta no banco (sem carregar a entidade completa nem suas relações), com a lista de status permitidos resolvida a partir da role do usuário autenticado dentro da própria query, nunca filtrada em memória depois de buscada
 - Cada `OccurrenceResponse` carrega um objeto `OccurrenceActions` (`canEdit`, `canDelete`, `canVerify`, `canResolve`) pré-calculado pelo backend — o frontend não precisa duplicar lógica de permissão, só ler o resultado
 - Na visão de moderação do admin (`GET /occurrences`), cada ocorrência também carrega um `reporterDisplayId` anônimo (ex: `#12345`) no lugar do UUID do denunciante — ver `anonymization` e "Decisões de design"
 
@@ -158,6 +150,7 @@ O `shared/contract` existe especificamente para permitir que módulos se comuniq
 
 - `MonitoredCityService`: geocoding via Open-Meteo, limite de cidades monitoradas por plano, evita duplicidade de cidade no banco (reaproveita registro existente antes de criar um novo)
 - `UserCity` mapeado com `@ManyToOne` real para `City` (JPA), refletindo a FK que já existia no schema
+- `GET /monitored-cities/climate` retorna as cidades monitoradas ativas do usuário já enriquecidas com o resumo climático mais recente de cada uma, evitando que o frontend precise fazer uma chamada por cidade — cidades sem dado climático coletado ainda (ex: recém-adicionadas, scheduler não rodou o primeiro ciclo) retornam com o campo de clima nulo, sem falhar a resposta inteira
 
 ### `notification`
 
@@ -208,6 +201,8 @@ O `.env.example` já vem com valores de desenvolvimento prontos (incluindo usuá
 Para testar o fluxo de pagamento real, é necessário preencher as próprias credenciais de teste do Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PREMIUM_PRICE_ID`) e rodar `stripe listen --forward-to localhost:8081/api/v1/webhooks/stripe` para receber webhooks localmente — sem isso, o restante do sistema funciona normalmente.
 
 A API sobe em `http://localhost:8081`. O Swagger UI fica disponível em `http://localhost:8081/swagger-ui.html`.
+
+> O frontend (React + Leaflet) que consome esta API vive em um repositório separado: [kairos-frontend](https://github.com/arthsdev/kairos-frontend).
 
 ## Autenticação e como testar a API
 
@@ -263,7 +258,7 @@ A suíte inteira roda **sem necessidade de infraestrutura real** (Docker não pr
 
 Cobertura por módulo — todos os módulos possuem testes automatizados cobrindo entidade/domínio, service (com mocks), controller (`@WebMvcTest`, quando aplicável) e, no caso de `occurrence`, também repositório (`@DataJpaTest` com H2 real):
 
-`occurrence` · `risk` (calculator, properties, service, consumer, producer) · `climate` (validação, service, consumer, producer) · `plan` (entidade, service) · `anonymization` (entidade, service, incluindo tratamento de condição de corrida) · `payment` (checkout service, parser de eventos, controller de webhook) · `cities` (geocoding, limite de plano) · `notification` (sender) · segurança (`KeycloakRoleConverter`, `FirstAccessProvisioningFilter`)
+`occurrence` (incluindo o endpoint de mapa, com autorização por role testada em três camadas: unit, `@DataJpaTest` e `@WebMvcTest`) · `risk` (calculator, properties, service, consumer, producer) · `climate` (validação, service, consumer, producer) · `plan` (entidade, service) · `anonymization` (entidade, service, incluindo tratamento de condição de corrida) · `payment` (checkout service, parser de eventos, controller de webhook) · `cities` (geocoding, limite de plano, resumo climático em lote) · `notification` (sender) · segurança (`KeycloakRoleConverter`, `FirstAccessProvisioningFilter`)
 
 ## Decisões de design
 
@@ -280,6 +275,7 @@ Algumas escolhas deliberadas, documentadas aqui porque costumam gerar boas pergu
 - **YAGNI aplicado a testes**: métodos gerados automaticamente pelo compilador (`equals`/`hashCode`/`toString` de records) não são testados — são responsabilidade da linguagem, não do domínio.
 - **`FirstAccessProvisioningFilter` generalizado em vez de um filtro por entidade**: quando surgiu a necessidade de provisionar uma segunda entidade (`UserReference`) no primeiro acesso, além do `Plan` já existente, o filtro original (`PlanFirstAccessFilter`) foi generalizado em vez de duplicado — um segundo filtro faria a mesma dança técnica (checar cache, criar se ausente) para outro domínio, duplicando mecanismo em vez de lógica de negócio. Uma interface genérica de "provisionador" foi cogitada e descartada por generalização prematura: com apenas dois casos concretos e nenhum terceiro previsto, o custo da abstração não se paga.
 - **Anonimização reversível do denunciante (`reporterDisplayId`)**: ocorrências mostram um identificador anônimo (`#12345`, derivado do ID sequencial de uma tabela local de referência) em vez do UUID do Keycloak, reduzindo viés de moderação e exposição desnecessária de identidade. Um hash determinístico sem persistência foi cogitado primeiro, mas descartado: sem uma tabela de mapeamento, não haveria como reverter o identificador de volta ao usuário real em caso de necessidade legítima (investigação de abuso, ordem judicial) — o mesmo problema de exposição indevida, só que na direção oposta. O campo só é populado na visão de moderação do admin — na resposta ao próprio criador da ocorrência, permanece `null`, o que também evita que o usuário conheça seu próprio identificador anônimo (benefício incidental: sem esse número, não há como inferir metadados do sistema, como contagem aproximada de usuários, a partir da própria conta).
+- **Endpoints leves e específicos por consumidor, não um único DTO "rico" reaproveitado em tudo**: o mapa de ocorrências (`GET /occurrences/map`) e o resumo climático em lote (`GET /monitored-cities/climate`) existem como endpoints próprios, separados da listagem paginada completa — cada um retornando apenas o que a tela que o consome de fato precisa, em vez de forçar todo cliente a pagar o custo de um payload rico que só um caso de uso específico usa.
 
 ## Débitos técnicos e limitações conhecidas
 
@@ -288,13 +284,16 @@ Algumas escolhas deliberadas, documentadas aqui porque costumam gerar boas pergu
 - Notificações de billing (falha de pagamento, cancelamento) hoje vão para o mesmo canal Discord operacional dos alertas de risco — não chegam ao usuário final diretamente. Um canal pessoal de verdade (e-mail via SMTP) exigiria uma nova implementação de `NotificationSender`
 - `FirstAccessProvisioningFilter`: o cache Redis pode dessincronizar da fonte de verdade (MySQL/Postgres) em cenários raros de reset independente dos dois armazenamentos; o tratamento de erro do filtro também não possui métrica/alerta, apenas log
 - Sem testes automatizados para o cliente/scheduler de integração com a API climática externa (parsing da resposta do Open-Meteo em si)
+- `GET /occurrences` (listagem administrativa paginada) ainda não tem paginação exposta de fato no frontend — o cliente hoje busca um lote fixo (`size=100`), suficiente para o volume atual de dados de demonstração, mas não para escala de produção
+- O motor de risco (`RiskCalculator`) calcula um `RiskLevel` por evento, mas não persiste esse resultado de forma consultável por região — ele dispara o alerta e o valor calculado não fica disponível para, por exemplo, um mapa de calor de risco agregado
 
 ## Roadmap
 
-- [ ] Frontend (React + Leaflet para visualização em mapa)
+- [x] Frontend (React + Leaflet para visualização em mapa) — [kairos-frontend](https://github.com/arthsdev/kairos-frontend)
 - [ ] Deploy em produção (Railway/Render + banco persistente)
 - [ ] Notificação de billing por e-mail (SMTP), não só canal operacional
 - [ ] Observabilidade (Prometheus/Grafana) para filas de processamento e schedulers
+- [ ] Persistência consultável do resultado do risk engine por região, viabilizando um mapa de calor de risco agregado
 
 ---
 
