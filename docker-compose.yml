@@ -22,6 +22,29 @@ services:
       timeout: 5s
       retries: 5
 
+  backend:
+    build: .
+    container_name: kairos-backend
+    env_file:
+      - .env
+    environment:
+      DB_HOST: mysql
+      REDIS_HOST: redis
+      RABBITMQ_HOST: rabbitmq
+    ports:
+      - "8081:8081"
+    depends_on:
+      mysql:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_healthy
+      keycloak:
+        condition: service_started
+    networks:
+      - kairos-network
+
   redis:
     image: redis:7.2-alpine
     container_name: kairos-redis
