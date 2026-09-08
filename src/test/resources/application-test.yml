@@ -37,6 +37,7 @@ stripe:
   premium-price-id: price_mock_dummy
 
 KEYCLOAK_URL: http://localhost:8080
+KEYCLOAK_INTERNAL_URL: http://localhost:8080
 KEYCLOAK_REALM: mock-realm
 KEYCLOAK_CLIENT_ID: mock-client-id
 KEYCLOAK_CLIENT_SECRET: mock-client-secret
