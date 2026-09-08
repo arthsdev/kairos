@@ -34,7 +34,7 @@ public class KeycloakAdminClient {
 
     public KeycloakAdminClient(
             WebClient webClient,
-            @Value("${keycloak.url}") String keycloakUrl,
+            @Value("${keycloak.internal-url}") String keycloakUrl,
             @Value("${keycloak.realm}") String realm,
             @Value("${keycloak.admin-client-id}") String adminClientId,
             @Value("${keycloak.admin-client-secret}") String adminClientSecret) {
