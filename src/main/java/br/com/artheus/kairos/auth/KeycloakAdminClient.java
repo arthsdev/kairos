@@ -125,8 +125,10 @@ public class KeycloakAdminClient {
                     return Mono.error(new AuthenticationServiceUnavailableException("Identity provider authentication failed"));
                 })
                 .bodyToMono(KeycloakAdminTokenResponse.class)
-                .onErrorMap(WebClientRequestException.class,
-                        e -> new AuthenticationServiceUnavailableException("Service unavailable while retrieving admin token"))
+                .onErrorMap(WebClientRequestException.class, e -> {
+                    log.error("Network error obtaining admin token from Keycloak: {}", e.getMessage(), e);
+                    return new AuthenticationServiceUnavailableException("Service unavailable while retrieving admin token");
+                })
                 .block();
 
         if (response == null || response.accessToken() == null) {
