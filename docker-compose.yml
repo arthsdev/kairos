@@ -72,6 +72,7 @@ services:
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT: false
+      KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME}
     command: start-dev --import-realm
     volumes:
       - ./keycloak:/opt/keycloak/data/import

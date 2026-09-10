@@ -23,7 +23,7 @@ public class AuthClient {
 
     public AuthClient(
             WebClient webClient,
-            @Value("${keycloak.url}") String keycloakUrl,
+            @Value("${keycloak.internal-url}") String keycloakUrl,
             @Value("${keycloak.realm}") String realm,
             @Value("${keycloak.client-id}") String clientId,
             @Value("${keycloak.client-secret}") String clientSecret) {
