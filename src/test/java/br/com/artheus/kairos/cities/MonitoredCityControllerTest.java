@@ -42,7 +42,8 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
         controllers = MonitoredCityController.class,
         properties = {
                 "KEYCLOAK_URL=http://localhost:8080",
-                "KEYCLOAK_REALM=mock-realm"
+                "KEYCLOAK_REALM=mock-realm",
+                "KEYCLOAK_INTERNAL_URL=http://localhost:8080"
         }
 )
 @Import(MonitoredCityControllerTest.TestSecurityConfig.class)
