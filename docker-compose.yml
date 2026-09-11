@@ -73,6 +73,9 @@ services:
       KC_HTTP_ENABLED: true
       KC_HOSTNAME_STRICT: false
       KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME}
+      KC_HOSTNAME_PORT: ${KC_HOSTNAME_PORT:-8080}
+      KC_PROXY: ${KC_PROXY_MODE:-none}
+      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS_MODE:-}
     command: start-dev --import-realm
     volumes:
       - ./keycloak:/opt/keycloak/data/import
