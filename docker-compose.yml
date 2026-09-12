@@ -41,7 +41,7 @@ services:
       rabbitmq:
         condition: service_healthy
       keycloak:
-        condition: service_started
+        condition: service_healthy
     networks:
       - kairos-network
 
@@ -71,12 +71,13 @@ services:
       KEYCLOAK_ADMIN: ${KEYCLOAK_ADMIN_USER}
       KEYCLOAK_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD}
       KC_HTTP_ENABLED: true
+      KC_HEALTH_ENABLED: true
       KC_HOSTNAME_STRICT: false
       KC_HOSTNAME: ${KEYCLOAK_PUBLIC_HOSTNAME}
       KC_HOSTNAME_PORT: ${KC_HOSTNAME_PORT:-8080}
+      KC_HOSTNAME_STRICT_HTTPS: ${KC_HOSTNAME_STRICT_HTTPS:-false}
       KC_PROXY: ${KC_PROXY_MODE:-none}
       KC_PROXY_HEADERS: ${KC_PROXY_HEADERS_MODE:-}
-      KC_HOSTNAME_STRICT_HTTPS: ${KC_HOSTNAME_STRICT_HTTPS:-false}
     command: start-dev --import-realm
     volumes:
       - ./keycloak:/opt/keycloak/data/import
@@ -87,6 +88,12 @@ services:
         condition: service_healthy
     networks:
       - kairos-network
+    healthcheck:
+      test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3" ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 90s
 
   rabbitmq:
     image: rabbitmq:3.13-management
