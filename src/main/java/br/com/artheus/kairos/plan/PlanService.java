@@ -9,6 +9,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -24,6 +25,7 @@ public class PlanService implements PaymentWebhookProcessor {
     private final PaymentCheckoutProvider paymentCheckoutProvider;
     private final BillingNotificationService billingNotificationService;
     private final SecurityService securityService;
+    private final PlanProvisioner planProvisioner;
 
     public PlanResponse createPlan(String userId) {
 
@@ -98,12 +100,7 @@ public class PlanService implements PaymentWebhookProcessor {
     public void ensurePlanExists(String userId) {
         if (!planRepository.existsByUserId(userId)) {
             try {
-                Plan plan = Plan.builder()
-                        .userId(userId)
-                        .build();
-
-                planRepository.saveAndFlush(plan);
-
+                planProvisioner.createPlan(userId);
             } catch (DataIntegrityViolationException ex) {
                 log.info("Plan creation race condition detected for user: {}. Plan already persisted concurrently.", userId);
             }
