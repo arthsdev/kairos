@@ -44,6 +44,9 @@ class PlanServiceTest {
     @Mock
     private SecurityService securityService;
 
+    @Mock
+    private PlanProvisioner planProvisioner;
+
     @InjectMocks
     private PlanService planService;
 
@@ -426,16 +429,14 @@ class PlanServiceTest {
     class EnsurePlanExistsTests {
 
         @Test
-        @DisplayName("Should create and saveAndFlush a default trial plan when user does not have one")
+        @DisplayName("Should create a plan via PlanProvisioner when user does not have one")
         void shouldCreatePlanWhenUserHasNone() {
             String userId = "user-new";
             when(planRepository.existsByUserId(userId)).thenReturn(false);
 
             planService.ensurePlanExists(userId);
 
-            ArgumentCaptor<Plan> planCaptor = ArgumentCaptor.forClass(Plan.class);
-            verify(planRepository, times(1)).saveAndFlush(planCaptor.capture());
-            assertThat(planCaptor.getValue().getUserId()).isEqualTo(userId);
+            verify(planProvisioner, times(1)).createPlan(userId);
         }
 
         @Test
@@ -446,21 +447,21 @@ class PlanServiceTest {
 
             planService.ensurePlanExists(userId);
 
-            verify(planRepository, never()).saveAndFlush(any(Plan.class));
+            verify(planProvisioner, never()).createPlan(any());
         }
 
         @Test
-        @DisplayName("Should handle race condition and complete gracefully when unique constraint is triggered")
+        @DisplayName("Should handle race condition and complete gracefully when constraint violation occurs")
         void shouldTreatRaceConditionAsNoOpWhenConstraintViolationOccurs() {
             String userId = "user-concurrent";
             when(planRepository.existsByUserId(userId)).thenReturn(false);
 
-            when(planRepository.saveAndFlush(any(Plan.class)))
-                    .thenThrow(new DataIntegrityViolationException("Duplicate key value violates unique constraint"));
+            doThrow(new DataIntegrityViolationException("Duplicate key value violates unique constraint"))
+                    .when(planProvisioner).createPlan(userId);
 
             planService.ensurePlanExists(userId);
 
-            verify(planRepository, times(1)).saveAndFlush(any(Plan.class));
+            verify(planProvisioner, times(1)).createPlan(userId);
         }
     }
 }
