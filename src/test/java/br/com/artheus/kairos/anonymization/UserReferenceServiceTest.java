@@ -24,11 +24,11 @@ class UserReferenceServiceTest {
     @Mock
     private UserReferenceRepository userReferenceRepository;
 
+    @Mock
+    private UserReferenceProvisioner userReferenceProvisioner;
+
     @InjectMocks
     private UserReferenceService userReferenceService;
-
-    @Captor
-    private ArgumentCaptor<UserReference> userReferenceCaptor;
 
     @Nested
     @DisplayName("Tests for ensureUserReferenceExists")
@@ -37,45 +37,35 @@ class UserReferenceServiceTest {
         private final String keycloakUserId = "keycloak-123";
 
         @Test
-        @DisplayName("Should save new user reference when it does not exist yet")
-        void shouldSaveNewUserReferenceWhenNotExists() {
-            // Given
+        @DisplayName("Should create user reference via provisioner when it does not exist yet")
+        void shouldCreateUserReferenceWhenNotExists() {
             when(userReferenceRepository.existsByKeycloakUserId(keycloakUserId)).thenReturn(false);
 
-            // When
             userReferenceService.ensureUserReferenceExists(keycloakUserId);
 
-            // Then
-            verify(userReferenceRepository).save(userReferenceCaptor.capture());
-            UserReference savedRef = userReferenceCaptor.getValue();
-            assertThat(savedRef.getKeycloakUserId()).isEqualTo(keycloakUserId);
+            verify(userReferenceProvisioner, times(1)).createUserReference(keycloakUserId);
         }
 
         @Test
         @DisplayName("Should do nothing when user reference already exists")
         void shouldDoNothingWhenUserReferenceAlreadyExists() {
-            // Given
             when(userReferenceRepository.existsByKeycloakUserId(keycloakUserId)).thenReturn(true);
 
-            // When
             userReferenceService.ensureUserReferenceExists(keycloakUserId);
 
-            // Then
-            verify(userReferenceRepository, never()).save(any());
+            verify(userReferenceProvisioner, never()).createUserReference(any());
         }
 
         @Test
         @DisplayName("Should catch DataIntegrityViolationException gracefully when concurrent creation happens")
         void shouldCatchDataIntegrityViolationOnConcurrentCreation() {
-            // Given
             when(userReferenceRepository.existsByKeycloakUserId(keycloakUserId)).thenReturn(false);
-            when(userReferenceRepository.save(any(UserReference.class)))
-                    .thenThrow(new DataIntegrityViolationException("Duplicate key constraint"));
+            doThrow(new DataIntegrityViolationException("Duplicate key constraint"))
+                    .when(userReferenceProvisioner).createUserReference(keycloakUserId);
 
-            // When / Then (Should not throw exception because of try-catch block)
             userReferenceService.ensureUserReferenceExists(keycloakUserId);
 
-            verify(userReferenceRepository).save(any(UserReference.class));
+            verify(userReferenceProvisioner, times(1)).createUserReference(keycloakUserId);
         }
     }
 
