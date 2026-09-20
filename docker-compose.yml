@@ -77,7 +77,7 @@ services:
       KC_HOSTNAME_PORT: ${KC_HOSTNAME_PORT:-8080}
       KC_HOSTNAME_STRICT_HTTPS: ${KC_HOSTNAME_STRICT_HTTPS:-false}
       KC_PROXY: ${KC_PROXY_MODE:-none}
-      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS_MODE:-}
+      KC_PROXY_HEADERS: ${KC_PROXY_HEADERS_MODE:-xforwarded}
     command: start-dev --import-realm
     volumes:
       - ./keycloak:/opt/keycloak/data/import
@@ -92,8 +92,8 @@ services:
       test: [ "CMD-SHELL", "exec 3<>/dev/tcp/localhost/8080 && echo -e 'GET /health/ready HTTP/1.1\r\nHost: localhost\r\nConnection: close\r\n\r\n' >&3 && grep -q '200 OK' <&3" ]
       interval: 10s
       timeout: 5s
-      retries: 10
-      start_period: 90s
+      retries: 15
+      start_period: 180s
 
   rabbitmq:
     image: rabbitmq:3.13-management
