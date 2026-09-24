@@ -202,24 +202,20 @@ cd kairos
 # 2. Copie o arquivo de variáveis de ambiente de exemplo
 cp .env.example .env
 
-# 3. Suba toda a infraestrutura (MySQL, Redis, RabbitMQ, Keycloak)
-docker compose up -d
+# 3. Suba toda a infraestrutura, incluindo o backend
+docker compose up -d --build
+```
 
-# 4. Rode a aplicação
+Isso sobe tudo (MySQL, Redis, RabbitMQ, Keycloak e o próprio backend) dentro do Docker, sem precisar rodar `mvn spring-boot:run` separadamente. Se preferir rodar o backend fora do Docker (útil para debug direto na IDE), suba só a infraestrutura de apoio e rode a aplicação manualmente:
+
+```bash
+docker compose up -d mysql redis rabbitmq keycloak
 mvn spring-boot:run
 ```
 
 O `.env.example` já vem com valores de desenvolvimento prontos (incluindo usuários e client secrets do Keycloak pré-configurados via realm export versionado). Não é necessário nenhum ajuste manual para rodar a aplicação e a suíte de testes.
 
-> As variáveis `KC_PROXY_MODE`, `KC_PROXY_HEADERS_MODE`, `KC_HOSTNAME_STRICT_HTTPS` e `KC_HOSTNAME_PORT` controlam como o Keycloak se comporta atrás de um proxy reverso. Localmente, ficam desativadas (`none`/`false`/`8080`), já que não há proxy no caminho. Ao subir a aplicação em produção atrás de um proxy reverso com TLS (ver [`docs/deployment-notes.md`](docs/deployment-notes.md)), basta garantir que o `.env` daquele ambiente use `KC_PROXY_HEADERS_MODE=xforwarded` (e os demais valores de proxy correspondentes) para que o Keycloak gere URLs e tokens corretos.
-
-Para testar o fluxo de pagamento real, é necessário preencher as próprias credenciais de teste do Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PREMIUM_PRICE_ID`) e rodar `stripe listen --forward-to localhost:8081/api/v1/webhooks/stripe` para receber webhooks localmente. Sem isso, o restante do sistema funciona normalmente.
-
-A API sobe em `http://localhost:8081`. O Swagger UI fica disponível em `http://localhost:8081/swagger-ui/index.html`.
-
-> O frontend (React + Leaflet) que consome esta API vive em um repositório separado: [kairos-frontend](https://github.com/arthsdev/kairos-frontend).
-
-O `.env.example` já vem com valores de desenvolvimento prontos (incluindo usuários e client secrets do Keycloak pré-configurados via realm export versionado). Não é necessário nenhum ajuste manual para rodar a aplicação e a suíte de testes.
+> As variáveis `KC_PROXY_MODE`, `KC_PROXY_HEADERS_MODE`, `KC_HOSTNAME_STRICT_HTTPS` e `KC_HOSTNAME_PORT` controlam como o Keycloak se comporta atrás de um proxy reverso. Localmente, ficam com os valores padrão do `.env.example` (proxy desativado), já que não há proxy no caminho. Ao subir a aplicação em produção atrás de um proxy reverso com TLS (ver [`docs/deployment-notes.md`](docs/deployment-notes.md)), o `.env` daquele ambiente precisa usar valores diferentes para que o Keycloak gere URLs e tokens corretos.
 
 Para testar o fluxo de pagamento real, é necessário preencher as próprias credenciais de teste do Stripe (`STRIPE_SECRET_KEY`, `STRIPE_PREMIUM_PRICE_ID`) e rodar `stripe listen --forward-to localhost:8081/api/v1/webhooks/stripe` para receber webhooks localmente. Sem isso, o restante do sistema funciona normalmente.
 
